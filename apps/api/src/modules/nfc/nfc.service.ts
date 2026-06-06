@@ -113,7 +113,7 @@ export async function validateNfc(
       where: { readerId: input.reader_id },
       data: { lastSeenAt: new Date() },
     })
-    .catch((err) => logger.warn({ err }, 'reader lastSeenAt update failed'));
+    .catch((err: unknown) => logger.warn({ err }, 'reader lastSeenAt update failed'));
 
   writeAudit(req, {
     action: AuditAction.CARD_VALIDATED,

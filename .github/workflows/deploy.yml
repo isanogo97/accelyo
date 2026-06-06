@@ -1,9 +1,12 @@
 name: Deploy production
 
+# Le deploiement ne se declenche QUE sur un tag de version (v1.2.3) ou
+# manuellement. Evite un echec a chaque push tant que les secrets de
+# registry/SSH ne sont pas configures dans les Settings du repo.
 on:
   push:
-    branches: [main]
     tags: ['v*']
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:

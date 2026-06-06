@@ -40,7 +40,7 @@ export function writeAudit(req: Request, ctx: AuditContext): void {
         userAgent: userAgent as string | null,
       },
     })
-    .catch((err) => {
+    .catch((err: unknown) => {
       // Si l'audit echoue on logge - JAMAIS de fail silencieux pour ce systeme.
       logger.error({ err, ctx }, 'audit log write failed');
     });

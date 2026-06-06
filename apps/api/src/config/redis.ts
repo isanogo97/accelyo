@@ -31,7 +31,7 @@ export function getRedis(): Redis {
     maxRetriesPerRequest: 3,
     lazyConnect: false,
   });
-  cached.on('error', (err) => {
+  cached.on('error', (err: Error) => {
     // ATTENTION: ne pas logger l'URL - peut contenir le mot de passe.
     logger.error({ err: err.message }, '[redis] connection error');
   });

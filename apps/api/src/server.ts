@@ -53,7 +53,7 @@ async function main() {
   process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   logger.fatal({ err }, 'boot failed');
   process.exit(1);
 });
