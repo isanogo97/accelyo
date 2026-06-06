@@ -1,0 +1,122 @@
+openapi: 3.0.3
+info:
+  title: Accelyo API
+  description: Plateforme de carte etudiante dematerialisee
+  version: 1.0.0
+
+servers:
+  - url: https://api.accelyo.fr/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+paths:
+  /auth/login:
+    post:
+      summary: Connexion administrateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Login OK ou MFA requise
+
+  /auth/mfa/verify:
+    post:
+      summary: Verification du code TOTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeToken, code]
+              properties:
+                challengeToken: { type: string }
+                code: { type: string }
+
+  /auth/refresh:
+    post:
+      summary: Rotation du refresh token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+
+  /students:
+    get:
+      summary: Liste des etudiants (paginee)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: pageSize
+          schema: { type: integer }
+
+    post:
+      summary: Creer un etudiant
+      security: [{ bearerAuth: [] }]
+
+  /students/{id}/gdpr-delete:
+    delete:
+      summary: Suppression RGPD complete (cascade)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+
+  /cards/issue/{studentId}:
+    post:
+      summary: Emettre une carte pour un etudiant
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: studentId
+          required: true
+          schema: { type: string, format: uuid }
+
+  /cards/{id}/revoke:
+    post:
+      summary: Revoquer une carte definitivement
+      security: [{ bearerAuth: [] }]
+
+  /nfc/validate:
+    post:
+      summary: Validation NFC par un lecteur Elatec
+      description: Endpoint public, signature HMAC du lecteur.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reader_id, reader_location, card_uid, timestamp, nonce, signature]
+              properties:
+                reader_id: { type: string }
+                reader_location: { type: string }
+                card_uid: { type: string }
+                timestamp: { type: integer }
+                nonce: { type: string }
+                signature: { type: string }

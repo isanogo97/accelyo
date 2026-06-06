@@ -1,0 +1,249 @@
+// =================================================================
+// Accelyo - Schema Prisma
+// =================================================================
+// Ce fichier definit le schema relationnel complet de la BDD.
+//
+// REGLE: Aucune modification du schema sans creer une migration.
+// Generer avec: npx prisma migrate dev --name <description>
+//
+// Si vous renommez un champ, pensez:
+//   1. Au schema GraphQL/REST (apps/api/src/modules)
+//   2. Au type partage (packages/shared/src/types)
+//   3. Aux validators Zod (packages/validators)
+//   4. Au dashboard (apps/dashboard) qui consomme l'API
+//
+// CHAMPS *Enc / *Hash:
+//   Les champs suffixes "Enc" sont chiffres (AES-256-GCM applicatif).
+//   Les champs suffixes "Hash" sont des HMAC-SHA-256 deterministes
+//   pour permettre les recherches exactes (numero etudiant, email).
+//   Ne JAMAIS stocker de donnees sensibles en clair.
+// =================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------
+// University = tenant. Un deploiement peut heberger N universites.
+// -----------------------------------------------------------------
+model University {
+  id             String         @id @default(uuid())
+  name           String
+  domain         String         @unique
+  siret          String?
+  deploymentMode DeploymentMode @default(CLOUD)
+  // JSONB - chiffre applicativement avant insertion (cle AES-256-GCM).
+  nfcConfig      Json?
+  izlyConfig     Json?
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  students  Student[]
+  admins    User[]
+  auditLogs AuditLog[]
+  readers   NfcReader[]
+
+  @@index([isActive])
+}
+
+// -----------------------------------------------------------------
+// User = compte admin du dashboard (super admin, admin universite, staff).
+// Les etudiants ne sont PAS des Users - voir model Student.
+// -----------------------------------------------------------------
+model User {
+  id             String      @id @default(uuid())
+  email          String      @unique
+  passwordHash   String
+  role           Role
+  universityId   String?
+  university     University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
+  // Secret TOTP chiffre AES-256-GCM avant stockage.
+  mfaSecret      String?
+  mfaEnabled     Boolean     @default(false)
+  // Codes de secours, chiffres (8 codes a usage unique).
+  backupCodes    String[]    @default([])
+  lastLoginAt    DateTime?
+  lastLoginIp    String?
+  failedAttempts Int         @default(0)
+  // Si renseigne, le compte est verrouille jusqu'a cette date.
+  lockedUntil    DateTime?
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([universityId])
+  @@index([role])
+}
+
+// -----------------------------------------------------------------
+// Student = beneficiaire d'une carte etudiante dematerialisee.
+// Les donnees sensibles sont chiffrees applicativement (Enc) et
+// indexees via leur HMAC pour les recherches exactes (Hash).
+// -----------------------------------------------------------------
+model Student {
+  id                String     @id @default(uuid())
+  universityId      String
+  university        University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  firstNameEnc      String
+  lastNameEnc       String
+  studentNumberEnc  String
+  emailEnc          String
+
+  studentNumberHash String
+  emailHash         String
+
+  enrollmentYear    Int
+  program           String?
+  // Hash de la photo (SHA-256) - la photo elle-meme est dans MinIO.
+  photoHash         String?
+  isActive          Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  card    Card?
+  devices Device[]
+
+  // Unicite par tenant: un meme numero etudiant peut exister dans
+  // 2 universites differentes. Pas de unicite globale.
+  @@unique([universityId, studentNumberHash])
+  @@unique([universityId, emailHash])
+  @@index([universityId])
+}
+
+// -----------------------------------------------------------------
+// Card = carte etudiante dematerialisee.
+// -----------------------------------------------------------------
+model Card {
+  id            String     @id @default(uuid())
+  studentId     String     @unique
+  student       Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  cardUid       String     @unique
+  // Cle publique RSA pour verification offline par les lecteurs.
+  publicKey     String     @db.Text
+  status        CardStatus @default(ACTIVE)
+  issuedAt      DateTime   @default(now())
+  expiresAt     DateTime
+  lastUsedAt    DateTime?
+  revokedAt     DateTime?
+  revokedReason String?
+
+  validations CardValidation[]
+
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// -----------------------------------------------------------------
+// Device = appareil mobile lie a un etudiant (max 2 actifs).
+// -----------------------------------------------------------------
+model Device {
+  id                String   @id @default(uuid())
+  studentId         String
+  student           Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  deviceFingerprint String   @unique
+  deviceName        String?
+  platform          Platform
+  registeredAt      DateTime @default(now())
+  lastActiveAt      DateTime?
+  isActive          Boolean  @default(true)
+
+  @@index([studentId])
+}
+
+// -----------------------------------------------------------------
+// CardValidation = log de chaque passage NFC sur un lecteur.
+// Volume eleve - peut etre archive trimestriellement.
+// -----------------------------------------------------------------
+model CardValidation {
+  id             String   @id @default(uuid())
+  cardId         String
+  card           Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  readerId       String
+  readerLocation String?
+  validatedAt    DateTime @default(now())
+  // Anti-replay - le nonce ne doit pas avoir ete vu avant.
+  nonce          String   @unique
+  success        Boolean
+  failureReason  String?
+
+  @@index([cardId, validatedAt])
+  @@index([readerId, validatedAt])
+}
+
+// -----------------------------------------------------------------
+// NfcReader = lecteur Elatec enregistre dans le systeme.
+// La cle d'API du lecteur est chiffree (apiKeyEnc).
+// -----------------------------------------------------------------
+model NfcReader {
+  id           String     @id @default(uuid())
+  universityId String
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  readerId     String     @unique
+  label        String
+  location     String
+  apiKeyEnc    String
+  isActive     Boolean    @default(true)
+  lastSeenAt   DateTime?
+  createdAt    DateTime   @default(now())
+
+  @@index([universityId])
+}
+
+// -----------------------------------------------------------------
+// AuditLog = journal d'audit immuable.
+// ATTENTION: aucune route ne doit modifier ou supprimer une entree.
+// Conservation 1 an minimum (obligation legale).
+// -----------------------------------------------------------------
+model AuditLog {
+  id           String      @id @default(uuid())
+  universityId String?
+  university   University? @relation(fields: [universityId], references: [id], onDelete: SetNull)
+  actorId      String?
+  actorRole    String?
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime    @default(now())
+
+  @@index([universityId, createdAt])
+  @@index([actorId])
+  @@index([action])
+}
+
+// =================================================================
+// Enums
+// =================================================================
+
+enum Role {
+  SUPER_ADMIN
+  UNIVERSITY_ADMIN
+  UNIVERSITY_STAFF
+  STUDENT
+}
+
+enum CardStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  EXPIRED
+}
+
+enum DeploymentMode {
+  CLOUD
+  ON_PREMISE
+}
+
+enum Platform {
+  ANDROID
+  IOS
+}
