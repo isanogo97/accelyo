@@ -77,8 +77,13 @@ jobs:
       - name: Apply migrations (test DB)
         run: npm run prisma:migrate --workspace @accelyo/api
 
-      - name: Tests + couverture
-        run: npm run test:coverage
+      # Appels workspace directs (sans turbo) pour garantir que les variables
+      # d'env du job sont transmises aux process de test.
+      - name: Tests unitaires (crypto)
+        run: npm run test --workspace @accelyo/crypto
+
+      - name: Tests API + couverture
+        run: npm run test:coverage --workspace @accelyo/api
 
   security-scan:
     runs-on: ubuntu-latest

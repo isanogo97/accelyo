@@ -6,6 +6,22 @@
   "globalEnv": [
     "NODE_ENV"
   ],
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "REDIS_URL",
+    "JWT_SECRET",
+    "JWT_REFRESH_SECRET",
+    "ENCRYPTION_KEY",
+    "API_BASE_URL",
+    "DASHBOARD_URL",
+    "MINIO_USER",
+    "MINIO_PASSWORD",
+    "RSA_PRIVATE_KEY_PATH",
+    "RSA_PUBLIC_KEY_PATH",
+    "IZLY_MODE",
+    "CORS_ORIGINS",
+    "LOG_LEVEL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": [
