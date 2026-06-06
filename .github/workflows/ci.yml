@@ -85,6 +85,31 @@ jobs:
       - name: Tests API + couverture
         run: npm run test:coverage --workspace @accelyo/api
 
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Dashboard: tsc -b + vite build (typecheck + bundle de prod).
+      - name: Build dashboard (typecheck + Vite)
+        run: npm run build --workspace @accelyo/dashboard
+
+      - name: Test dashboard (vitest)
+        run: npm run test --workspace @accelyo/dashboard
+
+      # Mobile: typecheck seul (le build natif Expo se fait via EAS/CI dediee).
+      - name: Typecheck mobile
+        run: npm run typecheck --workspace @accelyo/mobile
+
   security-scan:
     runs-on: ubuntu-latest
     steps:

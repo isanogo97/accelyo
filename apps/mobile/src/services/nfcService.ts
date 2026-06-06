@@ -59,6 +59,16 @@ class AccelyoNfcService {
     return this.active;
   }
 
+  /**
+   * Reponse preparee (token signe RS256 + payload) a renvoyer au lecteur
+   * Elatec via le handler d'evenement HCE Android. Renvoie null tant que
+   * l'emulation n'a pas ete demarree.
+   */
+  getPreparedResponse(): { token: string; payload: CardPayload } | null {
+    if (!this.preparedToken || !this.preparedPayload) return null;
+    return { token: this.preparedToken, payload: this.preparedPayload };
+  }
+
   // Stockes en memoire pour repondre aux events HCE.
   private preparedToken: string | null = null;
   private preparedPayload: CardPayload | null = null;

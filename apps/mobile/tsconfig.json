@@ -6,7 +6,11 @@
     "moduleResolution": "Bundler",
     "lib": ["ES2022"],
     "noEmit": true,
-    "types": ["react-native"]
+    "types": ["react-native"],
+    "baseUrl": ".",
+    "paths": {
+      "@accelyo/shared": ["../../packages/shared/src/index.ts"]
+    }
   },
   "include": ["src", "App.tsx"],
   "exclude": ["node_modules"]

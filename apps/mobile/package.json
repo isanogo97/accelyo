@@ -8,6 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "eslint src",
     "build": "expo export"
@@ -20,6 +21,7 @@
     "axios": "^1.6.7",
     "expo": "~50.0.0",
     "expo-constants": "~15.4.0",
+    "expo-crypto": "~12.8.1",
     "expo-device": "~5.9.3",
     "expo-local-authentication": "~13.8.0",
     "expo-secure-store": "~12.8.1",

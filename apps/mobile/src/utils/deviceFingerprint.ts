@@ -11,6 +11,7 @@
 
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import * as Crypto from 'expo-crypto';
 import { saveSecure, readSecure, STORAGE_KEYS } from './keychain';
 
 export async function getOrCreateFingerprint(): Promise<string> {
@@ -33,20 +34,10 @@ export async function getOrCreateFingerprint(): Promise<string> {
 }
 
 /**
- * Implementation SHA-256 a base de Web Crypto si dispo, fallback simple sinon.
- * En React Native >= 0.71, on peut utiliser crypto subtle via polyfill.
+ * SHA-256 native via expo-crypto (fiable sur iOS et Android, contrairement
+ * a TextEncoder/crypto.subtle qui ne sont pas garantis en React Native).
+ * Renvoie le digest en hexadecimal.
  */
 async function sha256(input: string): Promise<string> {
-  // ATTENTION: utilisation de Crypto.digestStringAsync recommandee si dispo.
-  // Implementation minimale ici - a renforcer en prod avec expo-crypto.
-  const buf = new TextEncoder().encode(input);
-  const hash = await (globalThis.crypto as unknown as {
-    subtle?: { digest: (a: string, b: ArrayBuffer) => Promise<ArrayBuffer> };
-  }).subtle?.digest('SHA-256', buf.buffer);
-  if (!hash) {
-    return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, input);
 }
