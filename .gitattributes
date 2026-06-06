@@ -1,0 +1,23 @@
+# Normalisation des fins de ligne.
+# Tout est traite comme texte avec des fins de ligne LF dans le depot,
+# quelle que soit la plateforme (evite le bruit CRLF sous Windows).
+* text=auto eol=lf
+
+# Scripts shell: TOUJOURS en LF (sinon ils cassent sous Linux/Docker).
+*.sh text eol=lf
+
+# Fichiers binaires: jamais de conversion de fin de ligne.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.jks binary
+*.p8 binary
+*.p12 binary
+*.keystore binary
