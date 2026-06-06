@@ -7,8 +7,10 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-test:
+  build-and-test:
     runs-on: ubuntu-latest
+
+    # Services Postgres + Redis pour les tests d'integration.
     services:
       postgres:
         image: postgres:16-alpine
@@ -31,41 +33,76 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    # Variables partagees par les etapes migrate + tests.
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/accelyo_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      JWT_REFRESH_SECRET: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      API_BASE_URL: http://localhost:3000
+      DASHBOARD_URL: http://localhost:5173
+      MINIO_USER: test
+      MINIO_PASSWORD: test
+      RSA_PRIVATE_KEY_PATH: /tmp/rsa_private.pem
+      RSA_PUBLIC_KEY_PATH: /tmp/rsa_public.pem
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
-      - name: Tests + couverture (minimum 80%)
+      - name: Install dependencies
+        run: npm ci
+
+      # Cles RSA ephemeres pour la signature des cartes (jamais commitees).
+      - name: Generate RSA test keys
+        run: |
+          openssl genrsa -out "$RSA_PRIVATE_KEY_PATH" 2048
+          openssl rsa -in "$RSA_PRIVATE_KEY_PATH" -pubout -out "$RSA_PUBLIC_KEY_PATH"
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Build le bundle de prod de l'API (esbuild inline les packages @accelyo
+      # depuis la source - pas de tsc cross-package fragile).
+      - name: Build API (bundle ESM)
+        run: npm run build --workspace @accelyo/api
+
+      # Applique le schema sur la base de test AVANT les tests d'integration.
+      - name: Apply migrations (test DB)
+        run: npm run prisma:migrate --workspace @accelyo/api
+
+      - name: Tests + couverture
         run: npm run test:coverage
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/accelyo_test
-          REDIS_URL: redis://localhost:6379
-          JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-          JWT_REFRESH_SECRET: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
-          ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-          API_BASE_URL: http://localhost:3000
-          DASHBOARD_URL: http://localhost:5173
-          MINIO_USER: test
-          MINIO_PASSWORD: test
-          RSA_PRIVATE_KEY_PATH: /tmp/key.pem
-          RSA_PUBLIC_KEY_PATH: /tmp/key.pub.pem
 
   security-scan:
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Audit dependencies
         run: npm audit --audit-level=high || true
+
       - name: CodeQL init
         uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
+
       - name: CodeQL analysis
         uses: github/codeql-action/analyze@v3
