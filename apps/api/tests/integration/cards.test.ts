@@ -90,3 +90,30 @@ describe('Cycle de vie carte', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('Cartes - transitions invalides (branches d erreur)', () => {
+  it('refuse de suspendre une carte revoquee (400)', async () => {
+    const { token, studentId } = await setupStudent();
+    const card = await api().post(`/api/v1/cards/issue/${studentId}`).set(auth(token)).send({});
+    await api().post(`/api/v1/cards/${card.body.data.id}/revoke`).set(auth(token)).send({ reason: 'perte de la carte' });
+    const res = await api().post(`/api/v1/cards/${card.body.data.id}/suspend`).set(auth(token)).send({ reason: 'tentative invalide' });
+    expect(res.status).toBe(400);
+  });
+
+  it('refuse de reactiver une carte active (400)', async () => {
+    const { token, studentId } = await setupStudent();
+    const card = await api().post(`/api/v1/cards/issue/${studentId}`).set(auth(token)).send({});
+    const res = await api().post(`/api/v1/cards/${card.body.data.id}/reactivate`).set(auth(token)).send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('reemet une carte apres revocation (meme dossier etudiant)', async () => {
+    const { token, studentId } = await setupStudent();
+    const first = await api().post(`/api/v1/cards/issue/${studentId}`).set(auth(token)).send({});
+    await api().post(`/api/v1/cards/${first.body.data.id}/revoke`).set(auth(token)).send({ reason: 'remplacement carte' });
+    // Carte revoquee -> une nouvelle emission est autorisee (pas de 409).
+    const second = await api().post(`/api/v1/cards/issue/${studentId}`).set(auth(token)).send({});
+    expect(second.status).toBe(201);
+    expect(second.body.data.status).toBe('ACTIVE');
+  });
+});

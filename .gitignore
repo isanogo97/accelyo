@@ -68,3 +68,6 @@ minio_data/
 # Uploads et media de developpement
 uploads/
 tmp/
+
+# Artefacts tsc build
+*.tsbuildinfo

@@ -112,3 +112,66 @@ describe('POST /api/v1/nfc/validate (public)', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('NFC - securite avancee (anti-replay, revocation, horloge)', () => {
+  it('rejette le rejeu du meme nonce (anti-replay)', async () => {
+    const { token, universityId } = await universityAdmin();
+    const { apiKey } = await registerReader(token);
+    const cardUid = await issueCardFor(token, universityId);
+    const base = {
+      reader_id: 'READER-001', reader_location: 'Batiment A - RDC',
+      card_uid: cardUid, timestamp: Date.now(),
+      nonce: randomBytes(16).toString('hex'),
+    };
+    const body = { ...base, signature: sign(apiKey, base) };
+    const first = await api().post('/api/v1/nfc/validate').send(body);
+    expect(first.body.data.granted).toBe(true);
+    const replay = await api().post('/api/v1/nfc/validate').send(body);
+    expect(replay.body.data.granted).toBe(false);
+    expect(replay.body.data.reason).toBe('nonce_replay');
+  });
+
+  it('refuse une carte revoquee (blacklist Redis)', async () => {
+    const { token, universityId } = await universityAdmin();
+    const { apiKey } = await registerReader(token);
+    const student = await api().post('/api/v1/students').set(auth(token)).send({
+      firstName: 'Rev', lastName: 'Oke', studentNumber: 'ETU60001',
+      email: 'revoke@univ.fr', universityId, enrollmentYear: 2025,
+    });
+    const card = await api().post(`/api/v1/cards/issue/${student.body.data.id}`).set(auth(token)).send({});
+    await api().post(`/api/v1/cards/${card.body.data.id}/revoke`).set(auth(token)).send({ reason: 'Carte perdue' });
+    const base = {
+      reader_id: 'READER-001', reader_location: 'Porte A',
+      card_uid: card.body.data.cardUid, timestamp: Date.now(),
+      nonce: randomBytes(16).toString('hex'),
+    };
+    const res = await api().post('/api/v1/nfc/validate').send({ ...base, signature: sign(apiKey, base) });
+    expect(res.body.data.granted).toBe(false);
+    expect(res.body.data.reason).toBe('card_blacklisted');
+  });
+
+  it('refuse un horodatage hors tolerance (anti-replay #1)', async () => {
+    const { token, universityId } = await universityAdmin();
+    const { apiKey } = await registerReader(token);
+    const cardUid = await issueCardFor(token, universityId);
+    const base = {
+      reader_id: 'READER-001', reader_location: 'Porte A',
+      card_uid: cardUid, timestamp: Date.now() - 120000,
+      nonce: randomBytes(16).toString('hex'),
+    };
+    const res = await api().post('/api/v1/nfc/validate').send({ ...base, signature: sign(apiKey, base) });
+    expect(res.body.data.granted).toBe(false);
+    expect(res.body.data.reason).toBe('timestamp_skew');
+  });
+
+  it('refuse un lecteur non enregistre', async () => {
+    const base = {
+      reader_id: 'INCONNU-999', reader_location: 'X',
+      card_uid: 'AABBCCDDEE11', timestamp: Date.now(),
+      nonce: randomBytes(16).toString('hex'),
+    };
+    const res = await api().post('/api/v1/nfc/validate').send({ ...base, signature: 'f'.repeat(64) });
+    expect(res.body.data.granted).toBe(false);
+    expect(res.body.data.reason).toBe('reader_not_registered');
+  });
+});
