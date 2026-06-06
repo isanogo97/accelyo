@@ -13,11 +13,13 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
-    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js",
-    "test:coverage": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --coverage",
+    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --runInBand",
+    "test:unit": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --testPathIgnorePatterns tests/integration",
+    "test:integration": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js tests/integration --runInBand",
+    "test:coverage": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --coverage --runInBand",
+    "docs:openapi": "node --import tsx scripts/dump-openapi.mjs",
     "lint": "eslint src",
-    "clean": "rm -rf dist",
-    "docs:openapi": "node --import tsx scripts/dump-openapi.mjs"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@accelyo/crypto": "*",
@@ -58,6 +60,7 @@
     "@types/node": "^20.11.0",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.14",
+    "@types/supertest": "^6.0.2",
     "@types/swagger-ui-express": "^4.1.6",
     "@types/uuid": "^9.0.8",
     "@types/ws": "^8.5.10",

@@ -1,0 +1,47 @@
+# =================================================================
+# Accelyo - Stack de TEST (Postgres + Redis exposes sur l'hote)
+# =================================================================
+# A la difference de docker-compose.yml (production, reseau interne
+# sans ports exposes), ce fichier EXPOSE Postgres et Redis sur l'hote
+# pour permettre aux tests d'integration de s'y connecter.
+#
+# - Postgres -> localhost:5435 (base "accelyo_test" creee au boot)
+# - Redis    -> localhost:6380 (sans mot de passe, pour simplifier les tests)
+#
+# Aligne avec apps/api/.env.test.
+#
+# Usage:
+#   docker compose -f infra/docker/docker-compose.test.yml up -d
+#   # ... lancer les tests ...
+#   docker compose -f infra/docker/docker-compose.test.yml down -v   # nettoyage
+# =================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: accelyo_test_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: accelyo_test
+      POSTGRES_USER: accelyo_user
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accelyo_user -d accelyo_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: accelyo_test_redis
+    restart: unless-stopped
+    # Pas de --requirepass: les tests utilisent redis://localhost:6380/1 sans auth.
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

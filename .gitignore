@@ -12,9 +12,9 @@ out/
 
 # Environnement - ATTENTION: ne JAMAIS commiter de .env reel
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+!.env.test.example
 
 # Secrets et cles - NE PAS TOUCHER
 *.pem

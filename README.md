@@ -165,6 +165,47 @@ Une fois l'API demarree, la doc Swagger est servie sur:
 
 La source de verite de la spec est `apps/api/src/docs/openapi.ts`.
 
+## Tests
+
+Deux niveaux de tests:
+
+- **Unitaires** (`apps/api/tests/*.test.ts`, `packages/crypto`): purs, sans
+  dependance externe. Couvrent le coeur securite (AES, HMAC, JWT, TOTP, RSA,
+  nonce, bcrypt) et la logique pure (RBAC, erreurs typees).
+- **Integration** (`apps/api/tests/integration/*.test.ts`): exercent l'API
+  reelle (Express + Prisma + Redis) de bout en bout: auth/MFA, etudiants,
+  cartes, NFC, universites, reports, mobile.
+
+### Tests unitaires (aucune infra requise)
+
+```bash
+cd apps/api && npm run test:unit
+# ou, pour le coeur crypto:
+cd packages/crypto && npm test
+```
+
+### Tests d'integration (Postgres + Redis requis)
+
+```bash
+# 1. Demarrer l'infra de dev (si pas deja fait)
+cd infra/docker && docker compose up -d postgres redis
+
+# 2. Creer la base de test DEDIEE et appliquer les migrations
+docker exec accelyo_postgres createdb -U accelyo_user accelyo_test
+cd apps/api
+cp .env.test.example .env.test     # puis renseigner les mots de passe
+DATABASE_URL="postgresql://accelyo_user:PASS@localhost:5435/accelyo_test" \
+  npx prisma migrate deploy
+
+# 3. Lancer les tests d'integration (ou la couverture complete)
+npm run test:integration
+npm run test:coverage              # seuil: 80% lignes/fonctions/statements
+```
+
+ATTENTION: les tests d'integration TRUNCATE la base et FLUSH le Redis a
+chaque test. Le fichier `.env.test` DOIT pointer vers `accelyo_test` et un
+index Redis dedie (`/1`), jamais vers la base de developpement.
+
 ## Contraintes absolues du projet
 
 - Zero secret dans le code (toujours via env)
