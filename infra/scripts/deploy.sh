@@ -21,6 +21,9 @@ COMPOSE_FILE="$ROOT_DIR/infra/docker/docker-compose.yml"
 
 cd "$ROOT_DIR"
 
+echo "[deploy] Mise a jour du code (git pull)..."
+git pull --ff-only 2>/dev/null || echo "[deploy] (pas de git pull - on continue avec le code local)"
+
 echo "[deploy] Pull des images..."
 docker compose -f "$COMPOSE_FILE" pull
 

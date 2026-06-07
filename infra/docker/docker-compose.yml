@@ -1,31 +1,30 @@
 # =================================================================
-# Accelyo - Docker Compose (production / on-premise)
+# Accelyo - Docker Compose (production)
 # =================================================================
-# Lance toute la stack:
-#   - api          : backend Node.js
-#   - dashboard    : front React (Vite build statique servi par nginx)
-#   - postgres     : base de donnees
-#   - redis        : cache + rate limit + nonces
-#   - minio        : stockage objets (photos)
-#   - nginx        : reverse proxy SSL termination
+# Deploiement depuis les images publiees sur GitHub Container Registry.
+# - Tier applicatif (api, dashboard): reseau interne + externe (internet
+#   sortant pour SMTP/Izly, et exposition sur l'hote).
+# - Tier donnees (postgres, redis, minio): reseau INTERNE uniquement
+#   (aucun acces internet, surface d'attaque minimale).
 #
-# ATTENTION:
-#   - Le reseau accelyo_internal est ISOLE (pas d'internet sortant).
-#   - Le reseau accelyo_external expose seulement le port 443.
-#   - Les volumes sont persistants (./data) - inclure dans les backups.
+# Acces par defaut (sans domaine):
+#   - Dashboard : http://<IP_SERVEUR>          (port 80)
+#   - API       : http://<IP_SERVEUR>:3000     (mobile + lecteurs NFC)
+#   Le dashboard proxifie /api vers l'API (meme origine, pas de CORS web).
+#
+# Quand un domaine + TLS seront prets: activer le service nginx
+#   docker compose --profile tls up -d
 # =================================================================
-
-version: '3.9'
 
 services:
   api:
-    build:
-      context: ../..
-      dockerfile: apps/api/Dockerfile
-    image: accelyo/api:latest
+    image: ${API_IMAGE:-ghcr.io/isanogo97/accelyo-api:latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-cloud}
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       JWT_SECRET: ${JWT_SECRET}
@@ -34,12 +33,21 @@ services:
       RSA_PRIVATE_KEY_PATH: /run/secrets/rsa_private.pem
       RSA_PUBLIC_KEY_PATH: /run/secrets/rsa_public.pem
       API_BASE_URL: ${API_BASE_URL}
+      DASHBOARD_URL: ${DASHBOARD_URL}
       CORS_ORIGINS: ${CORS_ORIGINS}
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
       MINIO_USER: ${MINIO_USER}
       MINIO_PASSWORD: ${MINIO_PASSWORD}
-      DASHBOARD_URL: ${DASHBOARD_URL}
+      MINIO_BUCKET: ${MINIO_BUCKET:-accelyo-media}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-Accelyo <no-reply@accelyo.fr>}
+      IZLY_MODE: ${IZLY_MODE:-deeplink}
     secrets:
       - rsa_private.pem
       - rsa_public.pem
@@ -48,8 +56,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    ports:
+      - "3000:3000"
     networks:
       - accelyo_internal
+      - accelyo_external
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s
@@ -57,24 +68,25 @@ services:
       retries: 3
 
   dashboard:
-    build:
-      context: ../..
-      dockerfile: apps/dashboard/Dockerfile
-    image: accelyo/dashboard:latest
+    image: ${DASHBOARD_IMAGE:-ghcr.io/isanogo97/accelyo-dashboard:latest}
     restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${DASHBOARD_PORT:-80}:80"
     networks:
       - accelyo_internal
+      - accelyo_external
 
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_DB: ${DB_NAME:-accelyo}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - accelyo_internal
     healthcheck:
@@ -109,8 +121,10 @@ services:
     networks:
       - accelyo_internal
 
+  # Reverse proxy TLS - OPTIONNEL (profil "tls"), pour un domaine + certificats.
   nginx:
     image: nginx:alpine
+    profiles: ["tls"]
     restart: unless-stopped
     ports:
       - "80:80"
@@ -118,7 +132,6 @@ services:
     volumes:
       - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ../nginx/ssl:/etc/nginx/ssl:ro
-      - certbot_data:/var/www/certbot
     depends_on:
       - api
       - dashboard
@@ -136,7 +149,6 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
-  certbot_data:
 
 networks:
   accelyo_internal:
