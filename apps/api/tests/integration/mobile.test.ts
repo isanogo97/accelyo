@@ -51,11 +51,12 @@ describe('POST /api/v1/mobile/device/register', () => {
   });
 });
 
-async function studentNoCard(email = 'nocard@univ.fr', num = 'ETU40001') {
-  const { token, universityId } = await universityAdmin(`adm-${num}@test.fr`);
+async function studentNoCard() {
+  // Email admin en minuscules: le schema de login normalise en lowercase.
+  const { token, universityId } = await universityAdmin('admin-nocard@test.fr');
   const s = await api().post('/api/v1/students').set(auth(token)).send({
-    firstName: 'No', lastName: 'Card', studentNumber: num,
-    email, universityId, enrollmentYear: 2025,
+    firstName: 'No', lastName: 'Card', studentNumber: 'ETU40001',
+    email: 'nocard@univ.fr', universityId, enrollmentYear: 2025,
   });
   return { studentId: s.body.data.id as string, stoken: studentToken(s.body.data.id, universityId) };
 }
