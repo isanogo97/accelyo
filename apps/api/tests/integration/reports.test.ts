@@ -37,3 +37,22 @@ describe('Izly', () => {
     expect(res.body.data.mode).toBe('deeplink');
   });
 });
+
+describe('Reports - vue SUPER_ADMIN (tous tenants)', () => {
+  it('usage agrege tous les tenants (200)', async () => {
+    const token = await superAdminToken('super-usage@accelyo.fr');
+    const res = await api().get('/api/v1/reports/usage').set(auth(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty('adoptionRate');
+  });
+
+  it('audit filtre par action et universite (200)', async () => {
+    const token = await superAdminToken('super-audit@accelyo.fr');
+    const { universityId } = await universityAdmin('adm-audit@test.fr');
+    const res = await api()
+      .get(`/api/v1/reports/audit?action=USER_LOGIN&universityId=${universityId}&page=1&pageSize=5`)
+      .set(auth(token));
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data.items)).toBe(true);
+  });
+});
