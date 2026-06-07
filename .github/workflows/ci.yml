@@ -106,9 +106,13 @@ jobs:
       - name: Test dashboard (vitest)
         run: npm run test --workspace @accelyo/dashboard
 
-      # Mobile: typecheck seul (le build natif Expo se fait via EAS/CI dediee).
+      # Mobile: typecheck + tests unitaires (ts-jest, modules natifs mockes).
+      # Le build natif Expo se fait via EAS/CI dediee.
       - name: Typecheck mobile
         run: npm run typecheck --workspace @accelyo/mobile
+
+      - name: Test mobile (jest)
+        run: npm run test --workspace @accelyo/mobile
 
   security-scan:
     runs-on: ubuntu-latest
