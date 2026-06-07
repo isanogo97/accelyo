@@ -8,6 +8,9 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Prisma a besoin d'openssl pour generer/charger le bon moteur sur Alpine.
+RUN apk add --no-cache openssl
+
 # Astuce monorepo: on copie d'abord les manifests pour profiter du cache Docker.
 COPY package.json package-lock.json* turbo.json tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/
@@ -33,6 +36,9 @@ RUN npm run build --workspace=@accelyo/api
 # -----------------------------------------------------------------
 FROM node:20-alpine AS runner
 WORKDIR /app
+
+# openssl requis au runtime par le moteur de requete Prisma.
+RUN apk add --no-cache openssl
 
 # Utilisateur non-root - obligatoire en production.
 RUN addgroup -S accelyo && adduser -S accelyo -G accelyo

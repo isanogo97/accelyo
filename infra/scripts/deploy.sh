@@ -27,7 +27,7 @@ echo "[deploy] Pull des images..."
 $COMPOSE pull
 
 echo "[deploy] Migrations Prisma..."
-$COMPOSE run --rm api npx prisma migrate deploy
+$COMPOSE run --rm --user root api npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
 
 echo "[deploy] Demarrage des services..."
 $COMPOSE up -d --remove-orphans
