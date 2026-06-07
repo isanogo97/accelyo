@@ -4,38 +4,37 @@
 # =================================================================
 # Pre-requis sur la machine cible:
 #   - Docker + Docker Compose v2
-#   - Acces a la registry (docker login)
-#   - Variables d'env definies dans /opt/accelyo/.env
+#   - Images accessibles (packages ghcr publics, ou docker login)
+#   - Fichier .env a la racine du repo (voir setup-prod-env.sh)
 #
-# Usage: ./infra/scripts/deploy.sh
-#
-# ATTENTION:
-#   - Le script execute les migrations Prisma AVANT de demarrer
-#     la nouvelle version pour eviter les desalignements schema/code.
-#   - En cas d'echec de migration, on n'avance PAS.
+# Usage: bash infra/scripts/deploy.sh
 # =================================================================
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 COMPOSE_FILE="$ROOT_DIR/infra/docker/docker-compose.yml"
+ENV_FILE="$ROOT_DIR/.env"
 
 cd "$ROOT_DIR"
+
+# Le .env est a la racine du repo: on le passe explicitement a compose.
+COMPOSE="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
 
 echo "[deploy] Mise a jour du code (git pull)..."
 git pull --ff-only 2>/dev/null || echo "[deploy] (pas de git pull - on continue avec le code local)"
 
 echo "[deploy] Pull des images..."
-docker compose -f "$COMPOSE_FILE" pull
+$COMPOSE pull
 
 echo "[deploy] Migrations Prisma..."
-docker compose -f "$COMPOSE_FILE" run --rm api npx prisma migrate deploy
+$COMPOSE run --rm api npx prisma migrate deploy
 
 echo "[deploy] Demarrage des services..."
-docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+$COMPOSE up -d --remove-orphans
 
 echo "[deploy] Healthcheck..."
 sleep 5
-if ! docker compose -f "$COMPOSE_FILE" ps | grep -q "(healthy)"; then
+if ! $COMPOSE ps | grep -q "(healthy)"; then
   echo "[deploy] AVERTISSEMENT: certains services ne sont pas encore healthy."
 fi
 
