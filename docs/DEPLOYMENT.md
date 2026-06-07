@@ -131,3 +131,35 @@ Quand un domaine pointera vers le serveur (A record vers `<IP_SERVEUR>`) :
     pg_dump -U accelyo_user accelyo > backup_$(date +%F).sql
   ```
 - Les volumes `postgres_data`, `redis_data`, `minio_data` sont persistants — à inclure dans les sauvegardes.
+
+---
+
+## Variante : déploiement ON-PREMISE (serveur de l'université)
+
+Le **même** `docker-compose.yml` sert pour le cloud et l'on-premise. Deux cas :
+
+**A. Le serveur a accès à internet** → identique au cloud : il pull les images
+depuis `ghcr.io`. Mettre `DEPLOYMENT_MODE=on_premise` dans `.env`.
+
+**B. Le serveur est isolé (pas d'accès ghcr)** → construire les images localement
+(les variables `API_IMAGE`/`DASHBOARD_IMAGE` rendent ça trivial) :
+
+```bash
+cd /opt/accelyo
+docker build -t accelyo-api:local      -f apps/api/Dockerfile .
+docker build -t accelyo-dashboard:local -f apps/dashboard/Dockerfile .
+
+# Dans .env :
+#   API_IMAGE=accelyo-api:local
+#   DASHBOARD_IMAGE=accelyo-dashboard:local
+#   DEPLOYMENT_MODE=on_premise
+
+docker compose -f infra/docker/docker-compose.yml run --rm api npx prisma migrate deploy
+docker compose -f infra/docker/docker-compose.yml up -d
+```
+
+> Pour un transfert sans build sur place : `docker save accelyo-api:local | gzip > api.tar.gz`
+> sur une machine connectée, puis `docker load` sur le serveur isolé.
+
+Le reste (secrets, `.env`, MinIO, sauvegardes) est identique. Aucune dépendance
+au SI universitaire : tout tourne dans les conteneurs Accelyo.
