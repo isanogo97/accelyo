@@ -4,7 +4,7 @@
  */
 import { createHmac, randomBytes } from 'crypto';
 import {
-  api, resetDb, closeAll, universityAdmin, auth,
+  api, resetDb, closeAll, universityAdmin, superAdminToken, createUniversity, auth,
 } from '../helpers/integration';
 
 beforeEach(resetDb);
@@ -173,5 +173,18 @@ describe('NFC - securite avancee (anti-replay, revocation, horloge)', () => {
     const res = await api().post('/api/v1/nfc/validate').send({ ...base, signature: 'f'.repeat(64) });
     expect(res.body.data.granted).toBe(false);
     expect(res.body.data.reason).toBe('reader_not_registered');
+  });
+});
+
+describe('NFC lecteurs - SUPER_ADMIN', () => {
+  it('un SUPER_ADMIN enregistre un lecteur via universityId du body (201)', async () => {
+    const token = await superAdminToken();
+    const u = await createUniversity({ domain: 'reader-univ.fr' });
+    const res = await api().post('/api/v1/nfc/readers').set(auth(token)).send({
+      reader_id: 'READER-SA-1', label: 'Lecteur SA', location: 'Hall', universityId: u.id,
+    });
+    expect(res.status).toBe(201);
+    const list = await api().get('/api/v1/nfc/readers').set(auth(token));
+    expect(list.status).toBe(200);
   });
 });

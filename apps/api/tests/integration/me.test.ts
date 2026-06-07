@@ -1,5 +1,6 @@
 /** Tests /api/v1/me + verification du middleware requireAuth. */
 import { api, resetDb, closeAll, superAdminToken, auth } from '../helpers/integration';
+import { studentToken } from '../helpers/tokens';
 
 beforeEach(resetDb);
 afterAll(closeAll);
@@ -29,5 +30,16 @@ describe('404', () => {
     const res = await api().get('/api/v1/nexistepas');
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('NOT_FOUND');
+  });
+});
+
+describe('GET /api/v1/me - compte inexistant', () => {
+  it('401 si le compte reference par le token n existe pas', async () => {
+    const t = studentToken(
+      '00000000-0000-0000-0000-000000000099',
+      '00000000-0000-0000-0000-000000000098',
+    );
+    const res = await api().get('/api/v1/me').set(auth(t));
+    expect(res.status).toBe(401);
   });
 });

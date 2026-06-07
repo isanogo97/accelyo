@@ -38,6 +38,6 @@ export default {
     // Branches: 55% - les chemins defensifs (catch, fallbacks, SUPER_ADMIN)
     // ne sont pas tous traverses par l'integration; a relever avec des tests
     // d'edge-cases cibles (NFC anti-replay, limites device, lignes CSV en erreur).
-    global: { lines: 80, branches: 60, functions: 80, statements: 80 },
+    global: { lines: 80, branches: 70, functions: 80, statements: 80 },
   },
 };

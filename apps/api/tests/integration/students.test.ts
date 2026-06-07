@@ -110,3 +110,19 @@ describe('Import CSV', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('Import CSV - insertion puis mise a jour', () => {
+  it('insere au 1er import puis met a jour au 2e (meme dossier)', async () => {
+    const { token, universityId } = await universityAdmin();
+    const csv = [
+      'firstName,lastName,studentNumber,email,enrollmentYear,program',
+      'Bob,Dupont,ETU90001,bob@univ.fr,2025,Math',
+    ].join('\n');
+    const first = await api().post('/api/v1/students/import').set(auth(token))
+      .field('universityId', universityId).attach('file', Buffer.from(csv), 'a.csv');
+    expect(first.status).toBe(200);
+    const second = await api().post('/api/v1/students/import').set(auth(token))
+      .field('universityId', universityId).attach('file', Buffer.from(csv), 'a.csv');
+    expect(second.status).toBe(200);
+  });
+});

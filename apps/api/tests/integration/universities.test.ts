@@ -100,3 +100,49 @@ describe('Isolation tenant', () => {
     expect(forbidden.status).toBe(403);
   });
 });
+
+describe('Universites - admins & branches d acces', () => {
+  it('refuse un email admin deja utilise (409)', async () => {
+    const token = await superAdminToken();
+    const u = await createUniversity({ domain: 'dup-admin.fr' });
+    const body = { email: 'staff@dup-admin.fr', role: 'UNIVERSITY_ADMIN' };
+    await api().post(`/api/v1/universities/${u.id}/admins`).set(auth(token)).send(body);
+    const dup = await api().post(`/api/v1/universities/${u.id}/admins`).set(auth(token)).send(body);
+    expect(dup.status).toBe(409);
+  });
+
+  it('404 pour creer un admin sur une universite inexistante', async () => {
+    const token = await superAdminToken();
+    const res = await api()
+      .post('/api/v1/universities/00000000-0000-0000-0000-000000000000/admins')
+      .set(auth(token))
+      .send({ email: 'x@y.fr', role: 'UNIVERSITY_STAFF' });
+    expect(res.status).toBe(404);
+  });
+
+  it('liste les admins d une universite (200)', async () => {
+    const token = await superAdminToken();
+    const u = await createUniversity({ domain: 'list-admins.fr' });
+    await api().post(`/api/v1/universities/${u.id}/admins`).set(auth(token))
+      .send({ email: 'a@list-admins.fr', role: 'UNIVERSITY_STAFF' });
+    const res = await api().get(`/api/v1/universities/${u.id}/admins`).set(auth(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('un admin voit les admins de SA fac mais pas d une autre (403)', async () => {
+    const { token, universityId } = await universityAdmin('adm-own@test.fr');
+    const own = await api().get(`/api/v1/universities/${universityId}/admins`).set(auth(token));
+    expect(own.status).toBe(200);
+    const other = await createUniversity({ domain: 'other-admins.fr' });
+    const forbidden = await api().get(`/api/v1/universities/${other.id}/admins`).set(auth(token));
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('stats refusees a un admin hors perimetre (403)', async () => {
+    const { token } = await universityAdmin('adm-stats@test.fr');
+    const other = await createUniversity({ domain: 'other-stats.fr' });
+    const res = await api().get(`/api/v1/universities/${other.id}/stats`).set(auth(token));
+    expect(res.status).toBe(403);
+  });
+});
