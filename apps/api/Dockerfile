@@ -8,8 +8,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Prisma a besoin d'openssl pour generer/charger le bon moteur sur Alpine.
-RUN apk add --no-cache openssl
+# openssl: requis par Prisma sur Alpine (generation/chargement du moteur).
+# python3/make/g++: chaine de build native pour que `npm ci` puisse compiler
+# bcrypt depuis les sources si le binaire pre-compile n'est pas telechargeable
+# (ex. 504 du CDN GitHub Releases) - rend le build deterministe et resilient.
+RUN apk add --no-cache openssl python3 make g++
 
 # Astuce monorepo: on copie d'abord les manifests pour profiter du cache Docker.
 COPY package.json package-lock.json* turbo.json tsconfig.base.json ./
