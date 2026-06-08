@@ -8,6 +8,7 @@ EMAIL="${2:?email super-admin requis}"
 PWD_SA="${3:?mot de passe super-admin requis}"
 API="$BASE/api/v1"
 DOM="demo-$RANDOM.fr"
+RID="READER-$RANDOM"
 
 # Extrait une valeur JSON imbriquee: jval cle1 cle2 ... (vide si absent)
 jval(){
@@ -56,20 +57,20 @@ echo "OK carte emise, UID Mifare: $CUID"
 
 step "7) Enregistrer un lecteur NFC (Elatec)"
 APIKEY=$(curl -s -X POST "$API/nfc/readers" -H "Authorization: Bearer $ATOK" -H 'Content-Type: application/json' \
-  -d '{"reader_id":"READER-DEMO-1","label":"Porte A","location":"Hall"}' | jval data apiKey)
+  -d "{\"reader_id\":\"$RID\",\"label\":\"Porte A\",\"location\":\"Hall\"}" | jval data apiKey)
 echo "OK lecteur enregistre, apiKey: ${APIKEY:0:16}..."
 
 step "8) VALIDATION NFC (lecteur presente la carte) -> doit etre GRANTED"
 TS=$(python3 -c "import time;print(int(time.time()*1000))")
 NONCE=$(openssl rand -hex 16)
-MSG="READER-DEMO-1|Hall|$CUID|$TS|$NONCE"
+MSG="$RID|Hall|$CUID|$TS|$NONCE"
 SIG=$(printf '%s' "$MSG" | openssl dgst -sha256 -hmac "$APIKEY" | sed 's/^.*= //')
 curl -s -X POST "$API/nfc/validate" -H 'Content-Type: application/json' \
-  -d "{\"reader_id\":\"READER-DEMO-1\",\"reader_location\":\"Hall\",\"card_uid\":\"$CUID\",\"timestamp\":$TS,\"nonce\":\"$NONCE\",\"signature\":\"$SIG\"}"; echo
+  -d "{\"reader_id\":\"$RID\",\"reader_location\":\"Hall\",\"card_uid\":\"$CUID\",\"timestamp\":$TS,\"nonce\":\"$NONCE\",\"signature\":\"$SIG\"}"; echo
 
 step "9) Re-validation MEME nonce -> doit etre DENIED (anti-replay)"
 curl -s -X POST "$API/nfc/validate" -H 'Content-Type: application/json' \
-  -d "{\"reader_id\":\"READER-DEMO-1\",\"reader_location\":\"Hall\",\"card_uid\":\"$CUID\",\"timestamp\":$TS,\"nonce\":\"$NONCE\",\"signature\":\"$SIG\"}"; echo
+  -d "{\"reader_id\":\"$RID\",\"reader_location\":\"Hall\",\"card_uid\":\"$CUID\",\"timestamp\":$TS,\"nonce\":\"$NONCE\",\"signature\":\"$SIG\"}"; echo
 
 step "10) Stats de l'universite (1 etudiant, 1 carte active)"
 curl -s "$API/universities/$UNIV_ID/stats" -H "Authorization: Bearer $ATOK"; echo
