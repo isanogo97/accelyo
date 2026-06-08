@@ -35,13 +35,13 @@ echo "OK universite: $UNIV_ID ($DOM)"
 
 step "3) Creer un admin d'universite"
 ADM=$(curl -s -X POST "$API/universities/$UNIV_ID/admins" -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
-  -d "{\"email\":\"admin-$DOM\",\"role\":\"UNIVERSITY_ADMIN\"}")
+  -d "{\"email\":\"admin@$DOM\",\"role\":\"UNIVERSITY_ADMIN\"}")
 ADMPWD=$(echo "$ADM" | jval data temporaryPassword)
-echo "OK admin: admin-$DOM / $ADMPWD"
+echo "OK admin: admin@$DOM / $ADMPWD"
 
 step "4) Login admin universite"
 ATOK=$(curl -s -X POST "$API/auth/login" -H 'Content-Type: application/json' \
-  -d "{\"email\":\"admin-$DOM\",\"password\":\"$ADMPWD\"}" | jval data tokens accessToken)
+  -d "{\"email\":\"admin@$DOM\",\"password\":\"$ADMPWD\"}" | jval data tokens accessToken)
 echo "OK token admin: ${ATOK:0:16}..."
 
 step "5) Creer un etudiant"
