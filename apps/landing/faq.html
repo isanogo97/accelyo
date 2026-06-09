@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="description" content="Questions frequentes sur la carte etudiante dematerialisee Accelyo : Wallet, NFC, iPhone, securite, RGPD, etudiants sans smartphone."/>
+<title>FAQ - Accelyo</title>
+<link rel="icon" href="/assets/logo.svg"/><link rel="stylesheet" href="/assets/styles.css"/>
+</head>
+<body>
+<header><div class="wrap nav">
+  <a class="brand" href="/"><img src="/assets/logo.svg" alt=""/>Accelyo</a>
+  <button class="burger" id="burger" aria-label="Menu">&#9776;</button>
+  <nav class="menu" id="menu">
+    <a class="l" href="/">Accueil</a>
+    <a class="l" href="/fonctionnalites">Fonctionnalites</a>
+    <a class="l" href="/securite">Securite &amp; RGPD</a>
+    <a class="l" href="/cas-usage">Cas d'usage</a>
+    <a class="l active" href="/faq">FAQ</a>
+    <a class="btn btn-ghost" href="/app/login">Se connecter</a>
+    <a class="btn btn-primary" href="/contact">Demander un devis</a>
+  </nav>
+</div></header>
+
+<div class="hero"><div class="wrap" style="padding:64px 24px 64px">
+  <span class="pill">FAQ</span>
+  <h1 style="margin-top:16px;font-size:42px">Questions frequentes</h1>
+  <p class="lead">Tout ce que les etablissements et les etudiants nous demandent le plus souvent.</p>
+</div></div>
+
+<section class="block"><div class="wrap">
+  <div class="faq">
+    <details open><summary>Comment la carte fonctionne-t-elle sans contact ?</summary><div class="a">Sur Android, la carte est emulee en NFC (HCE) : l'etudiant approche son telephone du lecteur, comme une carte bancaire. La validation est signee et fonctionne meme hors-ligne. Sur iPhone, la carte vit dans Apple Wallet ; le tap NFC est notre cible via le programme sans contact d'Apple.</div></details>
+    <details><summary>Et sur iPhone, c'est vraiment du sans contact ?</summary><div class="a">La carte s'ajoute dans Apple Wallet, accessible d'un geste comme un titre de transport. Apple reserve le tap NFC a son programme sans contact : c'est notre objectif d'integration. En attendant, la verification iPhone reste securisee via le Wallet.</div></details>
+    <details><summary>Faut-il telecharger une application ?</summary><div class="a">Cote etudiant, non : la carte s'ajoute directement dans Apple Wallet ou Google Wallet via un lien. Cote etablissement, tout se gere depuis une interface web.</div></details>
+    <details><summary>Comment importe-t-on les etudiants ?</summary><div class="a">Vous preparez un fichier CSV (nom, prenom, email, cursus, photo...) et l'importez. Les colonnes sont reconnues automatiquement et les cartes generees en lot.</div></details>
+    <details><summary>Les etudiants peuvent-ils creer un compte eux-memes ?</summary><div class="a">Non. Il n'y a pas d'inscription libre. Seul l'etablissement cree et controle les comptes : vous gardez la maitrise totale des acces.</div></details>
+    <details><summary>Que se passe-t-il si un etudiant n'a pas de smartphone ?</summary><div class="a">La carte reste accessible depuis un navigateur web. L'etablissement peut aussi editer ponctuellement une carte pour les rares cas concernes.</div></details>
+    <details><summary>Les donnees sont-elles securisees et conformes RGPD ?</summary><div class="a">Oui. Donnees chiffrees en AES-256, cartes signees (RSA), passages verifies par HMAC anti-rejeu, hebergement souverain en France et journal d'audit immuable. Une approche RGPD par conception.</div></details>
+    <details><summary>Peut-on gerer plusieurs campus ou promotions ?</summary><div class="a">Oui. La plateforme centralise la gestion de plusieurs sites et promotions, avec une isolation stricte des donnees par etablissement.</div></details>
+    <details><summary>Quel est le tarif ?</summary><div class="a">Le tarif depend du volume et de votre contexte. Nous etablissons un devis personnalise : <a href="/contact" style="color:var(--blue);font-weight:600">demandez le votre</a>.</div></details>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="fgrid">
+    <div><div class="brand"><img src="/assets/logo.svg" width="30" alt=""/>Accelyo</div><p style="max-width:290px;color:#94a3b8">La carte etudiante dematerialisee : sans contact, securisee, souveraine et hebergee en France.</p></div>
+    <div><h4>Solution</h4><ul><li><a href="/fonctionnalites">Fonctionnalites</a></li><li><a href="/securite">Securite &amp; RGPD</a></li><li><a href="/cas-usage">Cas d'usage</a></li></ul></div>
+    <div><h4>Ressources</h4><ul><li><a href="/faq">FAQ</a></li><li><a href="/contact">Contact</a></li><li><a href="/app/login">Se connecter</a></li></ul></div>
+    <div><h4>Contact</h4><ul><li><a href="/contact">Demander un devis</a></li><li>Hebergement France</li><li>Conforme RGPD</li></ul></div>
+  </div>
+  <div class="fbar"><span>&copy; <span id="year"></span> Accelyo - Carte etudiante dematerialisee</span><span>RGPD - AES-256 - Signature RSA - Heberge en France</span></div>
+</div></footer>
+<script src="/assets/site.js"></script>
+</body></html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="description" content="Contactez Accelyo pour une demonstration et un devis de carte etudiante dematerialisee adaptes a votre etablissement."/>
+<title>Contact &amp; devis - Accelyo</title>
+<link rel="icon" href="/assets/logo.svg"/><link rel="stylesheet" href="/assets/styles.css"/>
+</head>
+<body>
+<header><div class="wrap nav">
+  <a class="brand" href="/"><img src="/assets/logo.svg" alt=""/>Accelyo</a>
+  <button class="burger" id="burger" aria-label="Menu">&#9776;</button>
+  <nav class="menu" id="menu">
+    <a class="l" href="/">Accueil</a>
+    <a class="l" href="/fonctionnalites">Fonctionnalites</a>
+    <a class="l" href="/securite">Securite &amp; RGPD</a>
+    <a class="l" href="/cas-usage">Cas d'usage</a>
+    <a class="l" href="/faq">FAQ</a>
+    <a class="btn btn-ghost" href="/app/login">Se connecter</a>
+    <a class="btn btn-primary" href="/contact">Demander un devis</a>
+  </nav>
+</div></header>
+
+<div class="hero"><div class="wrap" style="padding:60px 24px 56px">
+  <span class="pill">Contact &amp; devis</span>
+  <h1 style="margin-top:16px;font-size:42px">Parlons de votre etablissement</h1>
+  <p class="lead">Accelyo se deploie en partenariat avec votre universite, ecole ou CFA. Laissez-nous un message : nous revenons vers vous pour une demonstration et un devis adaptes.</p>
+</div></div>
+
+<section class="block"><div class="wrap">
+  <div class="contact-grid">
+    <div>
+      <div class="eyebrow">Comment ca se passe</div>
+      <h2 class="title" style="font-size:26px">Une demo personnalisee, sans engagement</h2>
+      <p class="sub">Decrivez votre contexte (type d'etablissement, nombre d'etudiants, usages vises). Nous preparons une demonstration ciblee et un devis sur mesure.</p>
+      <div class="contact-info">
+        <div class="item"><span>&#9993;</span> <b>Par le formulaire</b> - reponse rapide</div>
+        <div class="item"><span>&#128274;</span> Donnees traitees de maniere confidentielle (RGPD)</div>
+        <div class="item"><span>&#127467;&#127479;</span> Solution hebergee en France</div>
+      </div>
+      <p class="note" style="margin-top:22px;color:var(--muted)">Vous avez deja un compte ? <a href="/app/login" style="color:var(--blue);font-weight:600">Connectez-vous a votre espace</a>.</p>
+    </div>
+    <div>
+      <form class="form" id="contactForm">
+        <div class="alert ok" id="okMsg">Merci, votre message a bien ete envoye. Nous vous recontactons rapidement.</div>
+        <div class="alert err" id="errMsg"></div>
+        <div class="field"><label for="name">Nom complet *</label><input id="name" type="text" required maxlength="120"/></div>
+        <div class="field"><label for="email">E-mail professionnel *</label><input id="email" type="email" required/></div>
+        <div class="field"><label for="organization">Etablissement / organisation</label><input id="organization" type="text" maxlength="160"/></div>
+        <div class="field"><label for="message">Votre besoin *</label><textarea id="message" required minlength="10" maxlength="5000" placeholder="Type d'etablissement, nombre d'etudiants, usages vises..."></textarea></div>
+        <button class="btn btn-primary" type="submit" id="submitBtn" style="width:100%">Envoyer ma demande</button>
+        <p class="note" style="margin-top:12px;color:var(--muted2);font-size:13px">* Champs obligatoires. En envoyant ce formulaire, vous acceptez d'etre recontacte au sujet de votre demande.</p>
+      </form>
+    </div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <div class="fgrid">
+    <div><div class="brand"><img src="/assets/logo.svg" width="30" alt=""/>Accelyo</div><p style="max-width:290px;color:#94a3b8">La carte etudiante dematerialisee : sans contact, securisee, souveraine et hebergee en France.</p></div>
+    <div><h4>Solution</h4><ul><li><a href="/fonctionnalites">Fonctionnalites</a></li><li><a href="/securite">Securite &amp; RGPD</a></li><li><a href="/cas-usage">Cas d'usage</a></li></ul></div>
+    <div><h4>Ressources</h4><ul><li><a href="/faq">FAQ</a></li><li><a href="/contact">Contact</a></li><li><a href="/app/login">Se connecter</a></li></ul></div>
+    <div><h4>Contact</h4><ul><li><a href="/contact">Demander un devis</a></li><li>Hebergement France</li><li>Conforme RGPD</li></ul></div>
+  </div>
+  <div class="fbar"><span>&copy; <span id="year"></span> Accelyo - Carte etudiante dematerialisee</span><span>RGPD - AES-256 - Signature RSA - Heberge en France</span></div>
+</div></footer>
+
+<script src="/assets/site.js"></script>
+<script>
+(function(){
+  var form=document.getElementById('contactForm');
+  var ok=document.getElementById('okMsg'), err=document.getElementById('errMsg'), btn=document.getElementById('submitBtn');
+  form.addEventListener('submit',function(e){
+    e.preventDefault(); ok.style.display='none'; err.style.display='none';
+    btn.disabled=true; btn.textContent='Envoi en cours...';
+    var payload={
+      name:document.getElementById('name').value.trim(),
+      email:document.getElementById('email').value.trim(),
+      organization:document.getElementById('organization').value.trim(),
+      message:document.getElementById('message').value.trim()
+    };
+    fetch('/api/v1/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(function(r){
+        if(r.ok){form.reset();ok.style.display='block';ok.scrollIntoView({behavior:'smooth',block:'center'});}
+        else{return r.json().then(function(d){throw new Error((d&&d.error&&d.error.message)||'Une erreur est survenue.');});}
+      })
+      .catch(function(e2){err.textContent=e2.message||'Impossible d envoyer le message. Reessayez plus tard.';err.style.display='block';})
+      .finally(function(){btn.disabled=false;btn.textContent='Envoyer ma demande';});
+  });
+})();
+</script>
+</body></html>
