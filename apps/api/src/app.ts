@@ -29,6 +29,7 @@ import nfcRoutes from './modules/nfc/nfc.routes';
 import izlyRoutes from './modules/izly/izly.routes';
 import reportsRoutes from './modules/reports/reports.routes';
 import mobileRoutes from './modules/mobile/mobile.routes';
+import contactRoutes from './modules/contact/contact.routes';
 
 export function buildApp(): Express {
   const app = express();
@@ -49,7 +50,6 @@ export function buildApp(): Express {
   });
 
   // Documentation OpenAPI: UI interactive sur /docs, spec brute sur /docs.json.
-  // La spec est inlinee (src/docs/openapi.ts) - pas de lecture de fichier au runtime.
   app.get('/docs.json', (_req: Request, res: Response) => {
     res.json(openapiSpec);
   });
@@ -74,6 +74,7 @@ export function buildApp(): Express {
   app.use('/api/v1/izly', izlyRoutes);
   app.use('/api/v1/reports', reportsRoutes);
   app.use('/api/v1/mobile', mobileRoutes);
+  app.use('/api/v1/contact', contactRoutes);
 
   // 404 - DOIT etre apres les routes, AVANT errorHandler.
   app.use((_req, _res, next) => next(new NotFoundError('Route inconnue')));

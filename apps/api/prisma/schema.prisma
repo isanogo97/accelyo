@@ -249,3 +249,20 @@ enum Platform {
   ANDROID
   IOS
 }
+
+// -----------------------------------------------------------------
+// ContactRequest = message du formulaire de contact du site vitrine.
+// Public (aucune authentification). Consulte par les SUPER_ADMIN.
+// -----------------------------------------------------------------
+model ContactRequest {
+  id           String   @id @default(uuid())
+  name         String
+  email        String
+  organization String?
+  message      String   @db.Text
+  ipAddress    String?
+  handled      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([handled, createdAt])
+}

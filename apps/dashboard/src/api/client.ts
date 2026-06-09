@@ -4,12 +4,11 @@
  * Comportement:
  *   - Ajoute automatiquement Authorization: Bearer <accessToken>
  *   - Sur 401, tente UNE fois un /refresh puis re-rejoue la requete.
- *   - Si le refresh echoue, deconnecte l'utilisateur et redirige /login.
+ *   - Si le refresh echoue, deconnecte l'utilisateur et redirige /app/login.
  *
  * Stockage des tokens:
  *   - accessToken en memoire (Zustand) - pas localStorage (XSS).
- *   - refreshToken en cookie HttpOnly cote API (alternative).
- *     Pour l'instant on utilise sessionStorage (a auditer).
+ *   - refreshToken en sessionStorage (a auditer).
  */
 
 import axios, { type AxiosError, type AxiosInstance } from 'axios';
@@ -55,7 +54,7 @@ api.interceptors.response.use(
           return tokens.accessToken;
         } catch {
           useAuthStore.getState().logout();
-          window.location.href = '/login';
+          window.location.href = '/app/login';
           return null;
         } finally {
           refreshing = null;

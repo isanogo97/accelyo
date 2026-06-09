@@ -23,7 +23,7 @@ export const TEST_PASSWORD = 'TestPassw0rd!@#';
 /** Vide toutes les tables + le Redis de test. A appeler en beforeEach. */
 export async function resetDb(): Promise<void> {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "AuditLog","CardValidation","Device","Card","Student","NfcReader","User","University" RESTART IDENTITY CASCADE;',
+    'TRUNCATE TABLE "ContactRequest","AuditLog","CardValidation","Device","Card","Student","NfcReader","User","University" RESTART IDENTITY CASCADE;',
   );
   await getRedis().flushdb();
 }

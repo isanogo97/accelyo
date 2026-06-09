@@ -5,8 +5,6 @@
  *   - Redirige /login si pas d'access token ni refresh token.
  *   - Affiche la nav laterale adaptee au role.
  *   - Affiche un BANNER en haut indiquant le contexte tenant courant.
- *     - SUPER_ADMIN: badge "Accelyo - Acces global" (rouge).
- *     - UNIVERSITY_ADMIN: badge avec le nom de l'universite (bleu).
  *
  * NE PAS RETIRER le banner - il evite les erreurs operationnelles type
  * "je pense gerer la Sorbonne mais je suis dans Sciences Po".
@@ -23,6 +21,11 @@ const NAV_BASE = [
   { to: '/readers', label: 'Lecteurs NFC', roles: 'ALL' as const },
   { to: '/audit', label: "Journal d'audit", roles: 'ALL' as const },
   { to: '/universities', label: 'Universites', roles: 'SUPER_ADMIN' as const },
+  {
+    to: '/contact-requests',
+    label: 'Demandes de contact',
+    roles: 'SUPER_ADMIN' as const,
+  },
   { to: '/settings', label: 'Parametres', roles: 'ALL' as const },
 ];
 
@@ -59,9 +62,7 @@ export function ProtectedLayout() {
       {me ? (
         <div
           className={`px-6 py-2 text-xs font-medium flex items-center justify-between ${
-            isSuperAdmin
-              ? 'bg-red-600 text-white'
-              : 'bg-blue-600 text-white'
+            isSuperAdmin ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'
           }`}
         >
           <div className="flex items-center gap-3">

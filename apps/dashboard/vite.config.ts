@@ -1,13 +1,15 @@
 /**
  * Configuration Vite (dev server + bundler).
  * ----------------------------------------------------------------
- * Le proxy /api vers le backend evite les soucis CORS en local.
- * En prod c'est nginx qui route les requetes (voir infra/nginx).
+ * base '/app/': le dashboard est servi sous accelyo.fr/app (la racine
+ * du domaine est occupee par le site vitrine). Les assets sont donc
+ * references avec le prefixe /app/.
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  base: '/app/',
   plugins: [react()],
   server: {
     port: 5173,

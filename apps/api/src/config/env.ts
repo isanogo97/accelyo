@@ -67,6 +67,10 @@ const envSchema = z.object({
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().default('Accelyo <no-reply@accelyo.fr>'),
 
+  // Adresse qui recoit les notifications du formulaire de contact (vitrine).
+  // Si absente, les demandes sont seulement stockees en base (pas d'e-mail).
+  CONTACT_NOTIFY_EMAIL: z.string().email().optional(),
+
   // Izly
   IZLY_MODE: z.enum(['deeplink', 'api_partner']).default('deeplink'),
   IZLY_API_KEY: z.string().optional(),
@@ -84,11 +88,8 @@ export function getEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     // console.error VOLONTAIRE: ecriture SYNCHRONE avant process.exit().
-    // Le transport pino (worker pino-pretty en dev) pourrait ne pas flusher
-    // a temps avant la sortie du process.
     console.error('Variables d\'environnement invalides:');
     console.error(parsed.error.flatten().fieldErrors);
-    // ATTENTION: on quitte plutot que de demarrer une API mal configuree.
     process.exit(1);
   }
   cached = parsed.data;
