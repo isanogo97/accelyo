@@ -56,8 +56,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "3000:3000"
+    # Port 3000 NON expose sur l'hote: l'API n'est joignable que via le
+    # reverse proxy nginx (https://accelyo.fr/api) et le reseau interne Docker.
     networks:
       - accelyo_internal
       - accelyo_external
