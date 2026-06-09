@@ -6,6 +6,7 @@ import {
   loginSchema,
   mfaVerifySchema,
   refreshTokenSchema,
+  changePasswordSchema,
 } from '@accelyo/validators';
 import {
   login,
@@ -14,6 +15,7 @@ import {
   logout,
   setupMfa,
   confirmMfa,
+  changePassword,
 } from './auth.service';
 import { respondOk, respondNoContent } from '../../utils/respond';
 
@@ -67,6 +69,26 @@ export async function postLogout(
   try {
     const body = refreshTokenSchema.parse(req.body);
     await logout(body.refreshToken);
+    respondNoContent(res);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function postChangePassword(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.auth) throw new Error('auth required');
+    const body = changePasswordSchema.parse(req.body);
+    await changePassword(
+      req,
+      req.auth.sub,
+      body.currentPassword,
+      body.newPassword,
+    );
     respondNoContent(res);
   } catch (e) {
     next(e);

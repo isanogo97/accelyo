@@ -155,3 +155,54 @@ describe('MFA cycle complet', () => {
     expect(verify.body.data.accessToken).toEqual(expect.any(String));
   });
 });
+
+describe('POST /api/v1/auth/password (changement mot de passe)', () => {
+  const NEW_PW = 'NouveauPass123!@#';
+
+  it('change le mot de passe avec le bon mot de passe actuel (204)', async () => {
+    await createUser({ email: 'cp@test.fr', role: Role.SUPER_ADMIN });
+    const token = await loginToken('cp@test.fr');
+    const res = await api()
+      .post('/api/v1/auth/password')
+      .set(auth(token))
+      .send({ currentPassword: TEST_PASSWORD, newPassword: NEW_PW });
+    expect(res.status).toBe(204);
+
+    // L'ancien mot de passe ne marche plus, le nouveau oui.
+    const oldLogin = await api()
+      .post('/api/v1/auth/login')
+      .send({ email: 'cp@test.fr', password: TEST_PASSWORD });
+    expect(oldLogin.status).toBe(401);
+    const newLogin = await api()
+      .post('/api/v1/auth/login')
+      .send({ email: 'cp@test.fr', password: NEW_PW });
+    expect(newLogin.status).toBe(200);
+  });
+
+  it('refuse si le mot de passe actuel est faux (401)', async () => {
+    await createUser({ email: 'cp2@test.fr', role: Role.SUPER_ADMIN });
+    const token = await loginToken('cp2@test.fr');
+    const res = await api()
+      .post('/api/v1/auth/password')
+      .set(auth(token))
+      .send({ currentPassword: 'MauvaisActuel1!', newPassword: NEW_PW });
+    expect(res.status).toBe(401);
+  });
+
+  it('refuse un nouveau mot de passe trop court (400)', async () => {
+    await createUser({ email: 'cp3@test.fr', role: Role.SUPER_ADMIN });
+    const token = await loginToken('cp3@test.fr');
+    const res = await api()
+      .post('/api/v1/auth/password')
+      .set(auth(token))
+      .send({ currentPassword: TEST_PASSWORD, newPassword: 'court' });
+    expect(res.status).toBe(400);
+  });
+
+  it('exige une authentification (401)', async () => {
+    const res = await api()
+      .post('/api/v1/auth/password')
+      .send({ currentPassword: TEST_PASSWORD, newPassword: NEW_PW });
+    expect(res.status).toBe(401);
+  });
+});

@@ -7,6 +7,7 @@ import {
   postMfaVerify,
   postRefresh,
   postLogout,
+  postChangePassword,
   postMfaSetup,
   postMfaConfirm,
 } from './auth.controller';
@@ -22,6 +23,9 @@ router.post('/login', limiterAuthLogin, postLogin);
 router.post('/mfa/verify', limiterAuthLogin, postMfaVerify);
 router.post('/refresh', limiterAuthRefresh, postRefresh);
 router.post('/logout', postLogout);
+
+// Changement de mot de passe - necessite d'etre deja authentifie.
+router.post('/password', requireAuth, postChangePassword);
 
 // Endpoints d'activation MFA - necessitent d'etre deja authentifie.
 router.post('/mfa/setup', requireAuth, postMfaSetup);

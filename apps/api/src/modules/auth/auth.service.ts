@@ -1,7 +1,8 @@
 /**
  * Logique metier de l'authentification.
  * ----------------------------------------------------------------
- * Couvre login, refresh, logout, MFA setup, MFA verify.
+ * Couvre login, refresh, logout, MFA setup, MFA verify, changement
+ * de mot de passe.
  *
  * REGLES IMPORTANTES:
  *   - Les reponses d'erreur de login DOIVENT etre identiques entre
@@ -13,6 +14,7 @@
 import { randomBytes } from 'crypto';
 import {
   verifyPassword,
+  hashPassword,
   issueTokenPair,
   verifyRefreshToken,
   generateMfaSecret,
@@ -275,6 +277,45 @@ export async function confirmMfa(
     resourceId: userId,
   });
   return { backupCodes };
+}
+
+/**
+ * Changement de mot de passe par l'utilisateur lui-meme (deja authentifie).
+ * Exige le mot de passe actuel (re-authentification) pour empecher qu'une
+ * session volee ne change le mot de passe sans le connaitre.
+ */
+export async function changePassword(
+  req: Request,
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new UnauthorizedError();
+
+  const ok = await verifyPassword(currentPassword, user.passwordHash);
+  if (!ok) {
+    writeAudit(req, {
+      action: AuditAction.USER_LOGIN_FAILED,
+      resourceType: 'User',
+      resourceId: user.id,
+      metadata: { reason: 'change_password_bad_current' },
+    });
+    throw new UnauthorizedError('Mot de passe actuel incorrect');
+  }
+
+  const newHash = await hashPassword(newPassword);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: newHash },
+  });
+
+  writeAudit(req, {
+    action: AuditAction.USER_PASSWORD_RESET,
+    resourceType: 'User',
+    resourceId: user.id,
+    metadata: { self: true },
+  });
 }
 
 async function issueAndStoreTokens(

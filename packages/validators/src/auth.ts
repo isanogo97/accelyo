@@ -40,3 +40,19 @@ export const resetPasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+/**
+ * Changement de mot de passe par un utilisateur deja authentifie.
+ * On exige le mot de passe actuel (re-authentification) et applique
+ * les regles completes (passwordSchema) sur le nouveau.
+ */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1).max(128),
+    newPassword: passwordSchema,
+  })
+  .refine((d) => d.currentPassword !== d.newPassword, {
+    message: 'Le nouveau mot de passe doit etre different de l\'actuel',
+    path: ['newPassword'],
+  });
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
