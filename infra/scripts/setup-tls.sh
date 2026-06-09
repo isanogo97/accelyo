@@ -41,7 +41,7 @@ set_env(){
 set_env API_BASE_URL   "https://$DOMAIN"
 set_env DASHBOARD_URL  "https://$DOMAIN"
 set_env CORS_ORIGINS   "https://$DOMAIN,https://www.$DOMAIN"
-set_env DASHBOARD_PORT "8080"   # libere le port 80 de l'hote pour nginx
+set_env DASHBOARD_PORT "127.0.0.1:8080"   # localhost only: nginx y accede en interne, pas d'expo publique
 
 echo "==> 6/6 Demarrage de la stack avec le reverse proxy TLS"
 $COMPOSE --profile tls up -d --remove-orphans
