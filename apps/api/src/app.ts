@@ -30,6 +30,7 @@ import izlyRoutes from './modules/izly/izly.routes';
 import reportsRoutes from './modules/reports/reports.routes';
 import mobileRoutes from './modules/mobile/mobile.routes';
 import contactRoutes from './modules/contact/contact.routes';
+import walletRoutes from './modules/wallet/wallet.routes';
 
 export function buildApp(): Express {
   const app = express();
@@ -75,6 +76,7 @@ export function buildApp(): Express {
   app.use('/api/v1/reports', reportsRoutes);
   app.use('/api/v1/mobile', mobileRoutes);
   app.use('/api/v1/contact', contactRoutes);
+  app.use('/api/v1/wallet', walletRoutes);
 
   // 404 - DOIT etre apres les routes, AVANT errorHandler.
   app.use((_req, _res, next) => next(new NotFoundError('Route inconnue')));

@@ -48,6 +48,12 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-Accelyo <no-reply@accelyo.fr>}
       IZLY_MODE: ${IZLY_MODE:-deeplink}
+      GOOGLE_WALLET_ISSUER_ID: ${GOOGLE_WALLET_ISSUER_ID:-}
+      GOOGLE_WALLET_KEY_PATH: ${GOOGLE_WALLET_KEY_PATH:-/run/secrets-wallet/google_wallet_key.json}
+    volumes:
+      # Lecture seule du dossier secrets (cle Google Wallet). Montage de
+      # dossier: ne bloque pas le demarrage si le fichier est absent.
+      - ../../secrets:/run/secrets-wallet:ro
     secrets:
       - rsa_private.pem
       - rsa_public.pem
