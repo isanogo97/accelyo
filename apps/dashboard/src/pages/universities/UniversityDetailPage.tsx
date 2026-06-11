@@ -15,6 +15,9 @@
  *     temporaryPassword a communiquer manuellement.
  *   - Un super-admin peut reinitialiser le mot de passe d'un admin existant
  *     (POST /admins/:userId/reset-password), meme logique e-mail/fallback.
+ *   - Un super-admin peut supprimer (desactiver) un admin existant
+ *     (DELETE /admins/:userId, 204): l'acces est coupe et l'admin disparait
+ *     de la liste (l'API ne renvoie que les admins actifs).
  */
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -146,6 +149,20 @@ export function UniversityDetailPage() {
         emailed: result.emailed,
         password: result.emailed ? null : result.temporaryPassword ?? null,
       });
+    },
+  });
+
+  // Suppression (desactivation) d'un admin (super-admin uniquement).
+  // L'API DELETE renvoie 204 et coupe l'acces de l'admin: il disparait
+  // ensuite de la liste car seuls les admins actifs sont renvoyes.
+  const deleteAdmin = useMutation({
+    mutationFn: async (userId: string) => {
+      await api.delete(`/universities/${id}/admins/${userId}`);
+      return userId;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['university', id] });
+      qc.invalidateQueries({ queryKey: ['university', id, 'admins'] });
     },
   });
 
@@ -312,21 +329,43 @@ export function UniversityDetailPage() {
                       : '-'}
                   </td>
                   <td className="py-2 text-right">
-                    <button
-                      onClick={() =>
-                        resetPassword.mutate({ userId: a.id, email: a.email })
-                      }
-                      disabled={
-                        resetPassword.isPending &&
+                    <div className="flex items-center justify-end gap-4">
+                      <button
+                        onClick={() =>
+                          resetPassword.mutate({ userId: a.id, email: a.email })
+                        }
+                        disabled={
+                          resetPassword.isPending &&
+                          resetPassword.variables?.userId === a.id
+                        }
+                        className="text-sm text-blue-600 hover:underline disabled:opacity-50"
+                      >
+                        {resetPassword.isPending &&
                         resetPassword.variables?.userId === a.id
-                      }
-                      className="text-sm text-blue-600 hover:underline disabled:opacity-50"
-                    >
-                      {resetPassword.isPending &&
-                      resetPassword.variables?.userId === a.id
-                        ? 'Reinitialisation...'
-                        : 'Reinitialiser le mot de passe'}
-                    </button>
+                          ? 'Reinitialisation...'
+                          : 'Reinitialiser le mot de passe'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Supprimer l'acces de ${a.email} ? Cet administrateur sera desactive et ne pourra plus se connecter.`,
+                            )
+                          ) {
+                            deleteAdmin.mutate(a.id);
+                          }
+                        }}
+                        disabled={
+                          deleteAdmin.isPending &&
+                          deleteAdmin.variables === a.id
+                        }
+                        className="text-sm text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        {deleteAdmin.isPending && deleteAdmin.variables === a.id
+                          ? 'Suppression...'
+                          : 'Supprimer'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -338,6 +377,15 @@ export function UniversityDetailPage() {
         {resetPassword.error ? (
           <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
             {(resetPassword.error as {
+              response?: { data?: { error?: { message?: string } } };
+            }).response?.data?.error?.message ?? 'Erreur'}
+          </div>
+        ) : null}
+
+        {/* Erreur de suppression d'admin (en dehors d'une ligne) */}
+        {deleteAdmin.error ? (
+          <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+            {(deleteAdmin.error as {
               response?: { data?: { error?: { message?: string } } };
             }).response?.data?.error?.message ?? 'Erreur'}
           </div>

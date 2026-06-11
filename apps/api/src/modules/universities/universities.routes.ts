@@ -410,4 +410,31 @@ router.post(
   },
 );
 
+/**
+ * Desactive un administrateur (SUPER_ADMIN). On ne supprime pas le compte
+ * (audit/historique) mais on coupe son acces (isActive=false).
+ */
+router.delete(
+  '/:id/admins/:userId',
+  requireRole(Role.SUPER_ADMIN),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = String(req.params.userId);
+      await prisma.user.update({
+        where: { id: userId },
+        data: { isActive: false },
+      });
+      writeAudit(req, {
+        action: AuditAction.UNIVERSITY_UPDATED,
+        resourceType: 'User',
+        resourceId: userId,
+        metadata: { deactivated: true },
+      });
+      respondNoContent(res);
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
 export default router;
