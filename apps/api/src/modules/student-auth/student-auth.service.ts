@@ -69,7 +69,7 @@ export async function issueActivation(
 
   const env = getEnv();
   const base = env.DASHBOARD_URL.replace(/\/$/, '');
-  const link = `${base}/activer?token=${token}`;
+  const link = `${base}/carte?token=${token}`;
   try {
     await sendEmail({
       to: plaintextEmail,
@@ -122,6 +122,25 @@ export async function activate(
     await issueCard(req, { studentId: student.id });
   } catch {
     // carte deja active - rien a faire.
+  }
+
+  // E-mail de confirmation avec le lien d'acces (best-effort).
+  try {
+    const env2 = getEnv();
+    const base = env2.DASHBOARD_URL.replace(/\/$/, '');
+    const email = decrypt(student.emailEnc, env2.ENCRYPTION_KEY);
+    await sendEmail({
+      to: email,
+      subject: 'Votre carte etudiante Accelyo est activee',
+      text:
+        'Bonjour,\n\n' +
+        'Votre carte etudiante est bien activee.\n' +
+        'Accedez-y a tout moment ici : ' + base + '/carte\n' +
+        '(connectez-vous avec votre e-mail et le mot de passe que vous venez de definir).\n\n' +
+        "L'application mobile (Apple Wallet, NFC) arrive bientot.\n",
+    });
+  } catch {
+    // envoi best-effort.
   }
 
   return { token: issueStudentToken(student.id) };

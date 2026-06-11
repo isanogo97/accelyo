@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="robots" content="noindex"/>
+<title>Ma carte etudiante - Accelyo</title>
+<link rel="icon" href="/assets/logo.svg"/>
+<style>
+  :root{ --brand:#2563eb; --brand-d:#1d4ed8; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+  body{background:#f1f5f9;color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .wrap{width:100%;max-width:420px}
+  .brand{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:18px;color:#0f172a;font-weight:700;font-size:20px}
+  .brand img{width:32px;height:32px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:26px}
+  h1{font-size:20px;margin-bottom:6px}
+  p.sub{color:var(--muted);font-size:14px;margin-bottom:16px}
+  label{display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px}
+  input{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:10px;font-size:16px;margin-bottom:13px}
+  input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  button.primary{width:100%;background:var(--brand);color:#fff;border:none;border-radius:11px;padding:13px;font-weight:700;font-size:15px;cursor:pointer}
+  button.primary:disabled{opacity:.5}
+  .err{color:#dc2626;font-size:13px;margin-bottom:12px}
+  .ok{color:#16a34a;font-size:14px;margin-bottom:12px;font-weight:600}
+  .idcard{border-radius:18px;padding:20px;color:#fff;background:linear-gradient(140deg,var(--brand),var(--brand-d));margin-bottom:16px}
+  .idcard .estab{font-size:12px;opacity:.85;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .idcard .nm{font-size:21px;font-weight:800;margin-top:14px}
+  .idcard .rl{font-size:13px;opacity:.9;margin-top:2px}
+  .idcard .num{font-family:monospace;font-size:14px;letter-spacing:1px;margin-top:14px;opacity:.95}
+  .idcard .st{display:inline-block;margin-top:12px;background:rgba(255,255,255,.18);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+  .gwbtn{width:100%;background:#fff;color:#1f2937;border:1px solid #dadce0;border-radius:11px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+  .hint{font-size:12px;color:var(--muted);margin-top:12px;text-align:center}
+  .logout{display:block;width:100%;text-align:center;color:var(--muted);font-size:13px;text-decoration:underline;margin-top:12px;background:none;border:none;cursor:pointer}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><img src="/assets/logo.svg" alt=""/>Accelyo</div>
+
+  <!-- Connexion -->
+  <div class="card hidden" id="loginCard">
+    <h1>Ma carte etudiante</h1>
+    <p class="sub">Connectez-vous pour acceder a votre carte.</p>
+    <div class="err hidden" id="lErr"></div>
+    <form id="loginForm">
+      <label for="lEmail">E-mail</label>
+      <input id="lEmail" type="email" autocomplete="email"/>
+      <label for="lPw">Mot de passe</label>
+      <input id="lPw" type="password" autocomplete="current-password"/>
+      <button class="primary" type="submit" id="lBtn">Se connecter</button>
+    </form>
+  </div>
+
+  <!-- Activation -->
+  <div class="card hidden" id="activateCard">
+    <h1>Activez votre carte</h1>
+    <p class="sub">Choisissez votre mot de passe pour activer votre carte (min 12 caracteres).</p>
+    <div class="err hidden" id="aErr"></div>
+    <form id="activateForm">
+      <label for="pw">Mot de passe</label>
+      <input id="pw" type="password" autocomplete="new-password"/>
+      <label for="pw2">Confirmer le mot de passe</label>
+      <input id="pw2" type="password" autocomplete="new-password"/>
+      <button class="primary" type="submit" id="aBtn">Activer ma carte</button>
+    </form>
+  </div>
+
+  <!-- Carte -->
+  <div class="card hidden" id="cardCard">
+    <div class="ok" id="okMsg">Votre carte.</div>
+    <div class="idcard">
+      <div class="estab" id="cEstab">Etablissement</div>
+      <div class="nm" id="cName">-</div>
+      <div class="rl" id="cRole">Etudiant</div>
+      <div class="num" id="cNum">-</div>
+      <span class="st">Active</span>
+    </div>
+    <button class="gwbtn" id="gwBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22 12c0-.7-.1-1.4-.2-2H12v4h5.6a4.8 4.8 0 0 1-2 3.2v2.6h3.3C20.7 18 22 15.3 22 12z"/><path fill="#34A853" d="M12 22c2.7 0 5-1 6.6-2.6l-3.3-2.6c-.9.6-2 .9-3.3.9-2.6 0-4.7-1.7-5.5-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.5 13.6a6 6 0 0 1 0-3.2V7.8H3.1a10 10 0 0 0 0 8.4z"/><path fill="#EA4335" d="M12 6.4c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.8l3.4 2.6C7.3 8 9.4 6.4 12 6.4z"/></svg>
+      Ajouter a Google Wallet
+    </button>
+    <div class="hint">L'application mobile (Apple Wallet, NFC) arrive bientot.</div>
+    <button class="logout" id="logoutBtn">Se deconnecter</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var API='/api/v1';
+  var params=new URLSearchParams(location.search);
+  var token=params.get('token');
+  var jwt=null;
+
+  var loginCard=document.getElementById('loginCard');
+  var activateCard=document.getElementById('activateCard');
+  var cardCard=document.getElementById('cardCard');
+
+  // Mode: token present -> activation ; sinon -> connexion.
+  if(token){ activateCard.classList.remove('hidden'); }
+  else { loginCard.classList.remove('hidden'); }
+
+  function show(el){ loginCard.classList.add('hidden'); activateCard.classList.add('hidden'); cardCard.classList.add('hidden'); el.classList.remove('hidden'); }
+  function setErr(id,m){ var e=document.getElementById(id); e.textContent=m; e.classList.remove('hidden'); }
+
+  // ----- Activation -----
+  var aBtn=document.getElementById('aBtn');
+  document.getElementById('activateForm').addEventListener('submit',function(e){
+    e.preventDefault(); document.getElementById('aErr').classList.add('hidden');
+    var pw=document.getElementById('pw').value, pw2=document.getElementById('pw2').value;
+    if(pw!==pw2){ setErr('aErr','Les mots de passe ne correspondent pas.'); return; }
+    if(pw.length<12){ setErr('aErr','Minimum 12 caracteres.'); return; }
+    aBtn.disabled=true; aBtn.textContent='Activation...';
+    fetch(API+'/student-auth/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token,password:pw})})
+      .then(function(r){ if(!r.ok) return r.json().then(function(d){throw new Error((d&&d.error&&d.error.message)||'Echec de l\'activation.');}); return r.json(); })
+      .then(function(d){ jwt=d.data.token; return loadCard('Carte activee.'); })
+      .catch(function(err){ setErr('aErr',err.message); aBtn.disabled=false; aBtn.textContent='Activer ma carte'; });
+  });
+
+  // ----- Connexion -----
+  var lBtn=document.getElementById('lBtn');
+  document.getElementById('loginForm').addEventListener('submit',function(e){
+    e.preventDefault(); document.getElementById('lErr').classList.add('hidden');
+    var email=document.getElementById('lEmail').value.trim(), pw=document.getElementById('lPw').value;
+    lBtn.disabled=true; lBtn.textContent='Connexion...';
+    fetch(API+'/student-auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pw})})
+      .then(function(r){ if(!r.ok) return r.json().then(function(d){throw new Error((d&&d.error&&d.error.message)||'Identifiants invalides.');}); return r.json(); })
+      .then(function(d){ jwt=d.data.token; return loadCard('Votre carte.'); })
+      .catch(function(err){ setErr('lErr',err.message); lBtn.disabled=false; lBtn.textContent='Se connecter'; });
+  });
+
+  function loadCard(msg){
+    return fetch(API+'/student-auth/me',{headers:{'Authorization':'Bearer '+jwt}})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var me=d.data;
+        var brand=(me.establishment&&me.establishment.brandColor)||'#2563eb';
+        document.documentElement.style.setProperty('--brand',brand);
+        document.getElementById('okMsg').textContent=msg;
+        document.getElementById('cEstab').textContent=(me.establishment&&me.establishment.name)||'Etablissement';
+        document.getElementById('cName').textContent=(me.student.firstName||'')+' '+(me.student.lastName||'');
+        document.getElementById('cNum').textContent=me.student.studentNumber||'';
+        show(cardCard);
+      });
+  }
+
+  document.getElementById('gwBtn').addEventListener('click',function(){
+    if(!jwt) return; var b=this; b.disabled=true;
+    fetch(API+'/student-auth/me/wallet/google',{headers:{'Authorization':'Bearer '+jwt}})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(d.data&&d.data.saveUrl){ window.open(d.data.saveUrl,'_blank'); } else { alert('Google Wallet indisponible pour le moment.'); } b.disabled=false; })
+      .catch(function(){ alert('Erreur Google Wallet.'); b.disabled=false; });
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click',function(){
+    jwt=null; location.href='/carte';
+  });
+})();

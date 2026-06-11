@@ -47,7 +47,7 @@ function buildLimiter(opts: {
 // Limiteurs preconfigures - voir le brief technique pour la matrice.
 export const limiterAuthLogin = buildLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 20,
   prefix: 'auth.login',
 });
 
