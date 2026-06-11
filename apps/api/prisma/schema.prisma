@@ -42,6 +42,10 @@ model University {
   sector         Sector         @default(SCHOOL)
   brandColor     String         @default("#2563eb")
   logoUrl        String?
+  address        String?
+  city           String?
+  postalCode     String?
+  siteCode       String?        @unique
   // JSONB - chiffre applicativement avant insertion (cle AES-256-GCM).
   nfcConfig      Json?
   izlyConfig     Json?
@@ -53,6 +57,7 @@ model University {
   admins    User[]
   auditLogs AuditLog[]
   readers   NfcReader[]
+  contacts  EstablishmentContact[]
 
   @@index([isActive])
 }
@@ -235,6 +240,20 @@ model AuditLog {
 // =================================================================
 // Enums
 // =================================================================
+
+model EstablishmentContact {
+  id           String     @id @default(uuid())
+  universityId String
+  university   University  @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  firstName    String
+  lastName     String
+  email        String?
+  phone        String?
+  jobTitle     String?
+  createdAt    DateTime   @default(now())
+
+  @@index([universityId])
+}
 
 enum Sector {
   SCHOOL

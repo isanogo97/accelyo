@@ -61,7 +61,17 @@ router.post(
         where: { domain: body.domain },
       });
       if (exists) throw new ConflictError('Domaine deja utilise');
-      const created = await prisma.university.create({ data: body });
+      // Numero de site: prefixe code postal (2 chiffres) + compteur global
+      // (sequence sur l'ensemble des etablissements).
+      let siteCode: string | undefined;
+      if (body.postalCode) {
+        const prefix = body.postalCode.slice(0, 2);
+        const total = await prisma.university.count();
+        siteCode = prefix + String(total + 1).padStart(2, '0');
+      }
+      const created = await prisma.university.create({
+        data: { ...body, ...(siteCode ? { siteCode } : {}) },
+      });
       writeAudit(req, {
         action: AuditAction.UNIVERSITY_CREATED,
         resourceType: 'University',
@@ -91,6 +101,7 @@ router.get('/:id', async (req, res, next) => {
       where: { id },
       include: {
         _count: { select: { students: true, admins: true, readers: true } },
+        contacts: { orderBy: { createdAt: 'asc' } },
       },
     });
     if (!u) throw new NotFoundError();
@@ -282,5 +293,48 @@ router.get('/:id/admins', async (req, res, next) => {
     next(e);
   }
 });
+
+// -----------------------------------------------------------------
+// Personnes a contacter de l'etablissement (SUPER_ADMIN).
+// -----------------------------------------------------------------
+const establishmentContactSchema = z.object({
+  firstName: z.string().min(1).max(120),
+  lastName: z.string().min(1).max(120),
+  email: emailSchema.optional(),
+  phone: z.string().max(40).optional(),
+  jobTitle: z.string().max(120).optional(),
+});
+
+router.post(
+  '/:id/contacts',
+  requireRole(Role.SUPER_ADMIN),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const universityId = String(req.params.id);
+      const body = establishmentContactSchema.parse(req.body);
+      const contact = await prisma.establishmentContact.create({
+        data: { universityId, ...body },
+      });
+      respondCreated(res, contact);
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+router.delete(
+  '/:id/contacts/:contactId',
+  requireRole(Role.SUPER_ADMIN),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await prisma.establishmentContact.delete({
+        where: { id: String(req.params.contactId) },
+      });
+      respondNoContent(res);
+    } catch (e) {
+      next(e);
+    }
+  },
+);
 
 export default router;

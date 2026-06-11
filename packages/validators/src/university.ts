@@ -38,6 +38,10 @@ export const createUniversitySchema = z.object({
   sector: sectorSchema.optional(),
   brandColor: brandColorSchema.optional(),
   logoUrl: z.string().url('URL de logo invalide').max(2048).optional(),
+  /** Coordonnees de l'etablissement. */
+  address: z.string().max(200).optional(),
+  city: z.string().max(120).optional(),
+  postalCode: z.string().regex(/^\d{5}$/, 'Code postal a 5 chiffres').optional(),
 });
 export type CreateUniversityInput = z.infer<typeof createUniversitySchema>;
 
