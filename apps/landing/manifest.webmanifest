@@ -1,0 +1,20 @@
+{
+  "name": "Accelyo",
+  "short_name": "Accelyo",
+  "description": "Votre carte etudiante numerique.",
+  "start_url": "/carte",
+  "scope": "/carte",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/assets/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}

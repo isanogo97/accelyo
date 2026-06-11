@@ -4,6 +4,8 @@
  *   POST /login            -> public: connexion etudiant
  *   GET  /me               -> etudiant: profil + carte + branding
  *   PATCH /me/consent      -> etudiant: consentement bons plans (RGPD)
+ *   GET  /me/wallet/google -> etudiant: lien "save to Google Wallet"
+ *   GET  /me/wallet/apple  -> etudiant: telecharge le .pkpass Apple Wallet
  *   POST /resend/:studentId-> admin: renvoyer le lien d'activation
  */
 import { Router } from 'express';
@@ -19,6 +21,7 @@ import {
   patchConsent,
   postResend,
   getMyWalletGoogle,
+  getMyWalletApple,
 } from './student-auth.controller';
 
 const router = Router();
@@ -29,6 +32,7 @@ router.post('/login', limiterAuthLogin, postLogin);
 router.get('/me', requireStudentAuth, getMeHandler);
 router.patch('/me/consent', requireStudentAuth, patchConsent);
 router.get('/me/wallet/google', requireStudentAuth, getMyWalletGoogle);
+router.get('/me/wallet/apple', requireStudentAuth, getMyWalletApple);
 
 router.post(
   '/resend/:studentId',

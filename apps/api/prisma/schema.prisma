@@ -58,6 +58,10 @@ model University {
   auditLogs AuditLog[]
   readers   NfcReader[]
   contacts  EstablishmentContact[]
+  announcements   Announcement[]
+  scheduleEntries ScheduleEntry[]
+  loans           LibraryLoan[]
+  deals           Deal[]
 
   @@index([isActive])
 }
@@ -128,6 +132,8 @@ model Student {
 
   card    Card?
   devices Device[]
+  scheduleEntries ScheduleEntry[]
+  loans           LibraryLoan[]
 
   // Unicite par tenant: un meme numero etudiant peut exister dans
   // 2 universites differentes. Pas de unicite globale.
@@ -255,6 +261,80 @@ model EstablishmentContact {
   createdAt    DateTime   @default(now())
 
   @@index([universityId])
+}
+
+model Announcement {
+  id           String     @id @default(uuid())
+  universityId String
+  university   University  @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  title        String
+  body         String
+  category     String?
+  isPinned     Boolean    @default(false)
+  publishedAt  DateTime   @default(now())
+  expiresAt    DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([universityId, publishedAt])
+}
+
+model ScheduleEntry {
+  id           String     @id @default(uuid())
+  universityId String
+  university   University  @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  studentId    String?
+  student      Student?    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  program      String?
+  title        String
+  location     String?
+  teacher      String?
+  startsAt     DateTime
+  endsAt       DateTime
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([universityId, startsAt])
+  @@index([studentId, startsAt])
+}
+
+model LibraryLoan {
+  id           String     @id @default(uuid())
+  universityId String
+  university   University  @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  bookTitle    String
+  bookAuthor   String?
+  isbn         String?
+  borrowedAt   DateTime   @default(now())
+  dueAt        DateTime
+  returnedAt   DateTime?
+  renewedCount Int        @default(0)
+  maxRenewals  Int        @default(2)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([studentId, dueAt])
+}
+
+model Deal {
+  id           String      @id @default(uuid())
+  universityId String?
+  university   University?  @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  partner      String?
+  category     String?
+  url          String?
+  code         String?
+  isActive     Boolean     @default(true)
+  startsAt     DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([universityId, isActive])
 }
 
 enum Sector {

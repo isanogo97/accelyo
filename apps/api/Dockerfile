@@ -52,6 +52,8 @@ COPY --from=builder /app/package.json /app/package-lock.json* /app/turbo.json ./
 COPY --from=builder /app/apps/api/package.json apps/api/
 COPY --from=builder /app/apps/api/dist apps/api/dist
 COPY --from=builder /app/apps/api/prisma apps/api/prisma
+# Scripts utilitaires (ex: seed de donnees de demo) - executables dans le conteneur.
+COPY --from=builder /app/apps/api/scripts apps/api/scripts
 COPY --from=builder /app/packages packages
 COPY --from=builder /app/node_modules node_modules
 

@@ -16,6 +16,10 @@ import {
   issueActivation,
 } from './student-auth.service';
 import { buildGoogleWalletSaveUrl } from '../wallet/wallet.service';
+import {
+  isAppleWalletConfigured,
+  buildApplePkpass,
+} from '../wallet/apple-wallet.service';
 import { issueCard } from '../cards/cards.service';
 import { prisma } from '../../config/database';
 import { getEnv } from '../../config/env';
@@ -90,6 +94,45 @@ export async function getMyWalletGoogle(
       // carte deja active.
     }
     respondOk(res, { saveUrl: await buildGoogleWalletSaveUrl(req.student.id) });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/**
+ * Genere et renvoie le passe Apple Wallet (.pkpass) de l'etudiant.
+ * Tant que le certificat Apple n'est pas configure -> 503 explicite.
+ */
+export async function getMyWalletApple(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.student) throw new Error('auth required');
+
+    if (!isAppleWalletConfigured()) {
+      res.status(503).json({
+        success: false,
+        error: { message: 'Apple Wallet pas encore configure' },
+      });
+      return;
+    }
+
+    // S'assurer qu'une carte existe avant de generer le passe (best-effort).
+    try {
+      await issueCard(req, { studentId: req.student.id });
+    } catch {
+      // carte deja active.
+    }
+
+    const buf = await buildApplePkpass(req.student.id);
+    res.setHeader('Content-Type', 'application/vnd.apple.pkpass');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="carte-accelyo.pkpass"',
+    );
+    res.send(buf);
   } catch (e) {
     next(e);
   }

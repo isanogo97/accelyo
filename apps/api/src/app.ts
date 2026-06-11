@@ -32,6 +32,7 @@ import mobileRoutes from './modules/mobile/mobile.routes';
 import contactRoutes from './modules/contact/contact.routes';
 import walletRoutes from './modules/wallet/wallet.routes';
 import studentAuthRoutes from './modules/student-auth/student-auth.routes';
+import studentPortalRoutes from './modules/student-portal/student-portal.routes';
 
 export function buildApp(): Express {
   const app = express();
@@ -79,6 +80,7 @@ export function buildApp(): Express {
   app.use('/api/v1/contact', contactRoutes);
   app.use('/api/v1/wallet', walletRoutes);
   app.use('/api/v1/student-auth', studentAuthRoutes);
+  app.use('/api/v1/student-auth/me', studentPortalRoutes);
 
   // 404 - DOIT etre apres les routes, AVANT errorHandler.
   app.use((_req, _res, next) => next(new NotFoundError('Route inconnue')));

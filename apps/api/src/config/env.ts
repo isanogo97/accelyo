@@ -54,6 +54,23 @@ const envSchema = z.object({
   GOOGLE_WALLET_ISSUER_ID: z.string().optional(),
   GOOGLE_WALLET_KEY_PATH: z.string().optional(),
 
+  // Apple Wallet (.pkpass carte etudiante). Tous optionnels: si le
+  // certificat Apple n'est pas fourni, l'endpoint /wallet/apple
+  // renvoie un 503 "pas encore configure". Voir
+  // src/modules/wallet/APPLE_WALLET_SETUP.md.
+  APPLE_WALLET_PASS_TYPE_ID: z.string().optional(),
+  APPLE_WALLET_TEAM_ID: z.string().optional(),
+  APPLE_WALLET_CERT_PATH: z
+    .string()
+    .default('/run/secrets-wallet/apple_pass_cert.pem'),
+  APPLE_WALLET_KEY_PATH: z
+    .string()
+    .default('/run/secrets-wallet/apple_pass_key.pem'),
+  APPLE_WALLET_WWDR_PATH: z
+    .string()
+    .default('/run/secrets-wallet/apple_wwdr.pem'),
+  APPLE_WALLET_KEY_PASSPHRASE: z.string().optional(),
+
   IZLY_MODE: z.enum(['deeplink', 'api_partner']).default('deeplink'),
   IZLY_API_KEY: z.string().optional(),
   IZLY_API_URL: z.string().url().optional(),
