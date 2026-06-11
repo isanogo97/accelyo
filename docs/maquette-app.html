@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Accelyo — Maquette app etudiant</title>
+<style>
+  :root{ --brand:#2563eb; --brand-d:#1d4ed8; }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
+  body{background:#0f172a;color:#0f172a;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 12px 60px}
+  .demobar{background:#1e293b;color:#e2e8f0;border-radius:14px;padding:14px 18px;display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-bottom:26px;max-width:560px}
+  .demobar h1{font-size:15px;font-weight:700;color:#fff}
+  .demobar .grp{display:flex;align-items:center;gap:8px;font-size:13px;color:#94a3b8}
+  .seg{display:flex;background:#0f172a;border-radius:9px;padding:3px}
+  .seg button{background:none;border:none;color:#94a3b8;padding:6px 12px;border-radius:7px;font-size:13px;cursor:pointer;font-weight:600}
+  .seg button.on{background:var(--brand);color:#fff}
+  .sw{display:flex;gap:6px}
+  .sw span{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+  .sw span.on{border-color:#fff}
+  .note{color:#64748b;font-size:12px;max-width:560px;text-align:center;margin-bottom:18px}
+
+  /* phone */
+  .phone{width:340px;height:710px;background:#000;border-radius:44px;padding:11px;box-shadow:0 30px 70px -20px rgba(0,0,0,.6)}
+  .screen{width:100%;height:100%;background:#f1f5f9;border-radius:34px;overflow:hidden;position:relative;display:flex;flex-direction:column}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:130px;height:26px;background:#000;border-radius:0 0 16px 16px;z-index:30}
+  .appbar{background:var(--brand);color:#fff;padding:30px 18px 14px;display:flex;align-items:center;justify-content:space-between}
+  .appbar .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:17px}
+  .appbar .logo .m{width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center}
+  .appbar .logo .m svg{width:16px;height:16px}
+  .body{flex:1;overflow-y:auto;padding:16px 16px 90px}
+  .tabbar{position:absolute;bottom:0;left:0;right:0;height:64px;background:#fff;border-top:1px solid #e2e8f0;display:flex;z-index:20}
+  .tabbar button{flex:1;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#94a3b8;font-size:10.5px;font-weight:600}
+  .tabbar button.on{color:var(--brand)}
+  .tabbar button svg{width:22px;height:22px}
+
+  h2.t{font-size:19px;font-weight:800;margin-bottom:4px}
+  p.s{font-size:13px;color:#64748b;margin-bottom:14px}
+  .card{background:#fff;border:1px solid #e8edf3;border-radius:14px;padding:15px;margin-bottom:12px}
+
+  /* student card */
+  .idcard{border-radius:18px;padding:18px;color:#fff;background:linear-gradient(140deg,var(--brand),var(--brand-d));box-shadow:0 14px 30px -12px rgba(0,0,0,.4);margin-bottom:16px}
+  .idcard .top{display:flex;justify-content:space-between;align-items:flex-start}
+  .idcard .estab{font-size:12px;opacity:.85;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .idcard .who{display:flex;gap:13px;align-items:center;margin:16px 0}
+  .idcard .ph{width:58px;height:58px;border-radius:12px;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+  .idcard .nm{font-size:19px;font-weight:800;line-height:1.1}
+  .idcard .rl{font-size:12.5px;opacity:.9;margin-top:2px}
+  .idcard .meta{display:flex;justify-content:space-between;align-items:flex-end}
+  .idcard .num{font-family:monospace;font-size:13px;letter-spacing:1px;opacity:.95}
+  .qr{width:54px;height:54px;border-radius:8px;background:#fff;padding:5px}
+  .qr svg{width:100%;height:100%}
+  .badge-ok{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.18);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+
+  .wbtn{display:flex;gap:10px;margin-bottom:6px}
+  .wbtn button{flex:1;border:none;border-radius:11px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}
+  .w-apple{background:#000;color:#fff}
+  .w-google{background:#fff;color:#1f2937;border:1px solid #dadce0}
+
+  .row{display:flex;gap:11px;align-items:center}
+  .ic{width:38px;height:38px;border-radius:10px;background:color-mix(in srgb,var(--brand) 12%,#fff);color:var(--brand);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .ic svg{width:19px;height:19px}
+  .li-title{font-size:14.5px;font-weight:700}
+  .li-sub{font-size:12.5px;color:#64748b}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+  .pill-blue{background:color-mix(in srgb,var(--brand) 14%,#fff);color:var(--brand-d)}
+  .pill-red{background:#fee2e2;color:#dc2626}
+  .pill-green{background:#dcfce7;color:#16a34a}
+  .smallbtn{border:1px solid var(--brand);color:var(--brand);background:#fff;border-radius:8px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .codebox{display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:9px;padding:8px 12px;margin-top:8px}
+  .code{font-family:monospace;font-weight:700;letter-spacing:1px;color:var(--brand-d)}
+  .consent{background:color-mix(in srgb,var(--brand) 8%,#fff);border:1px solid color-mix(in srgb,var(--brand) 25%,#fff);border-radius:12px;padding:14px;margin-bottom:14px}
+  .toggle{width:42px;height:24px;border-radius:20px;background:var(--brand);position:relative;cursor:pointer;flex-shrink:0}
+  .toggle::after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;right:3px}
+  .bigbtn{width:100%;background:var(--brand);color:#fff;border:none;border-radius:11px;padding:13px;font-weight:700;font-size:14px;cursor:pointer;margin-top:8px}
+  .field{margin-bottom:11px}
+  .field label{font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:5px}
+  .field input{width:100%;border:1px solid #cbd5e1;border-radius:9px;padding:11px;font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="demobar">
+  <h1>Maquette — app etudiant</h1>
+  <div class="grp">Secteur
+    <div class="seg" id="sectorSeg">
+      <button data-sector="ecole" class="on">Ecole</button>
+      <button data-sector="biblio">Bibliotheque</button>
+    </div>
+  </div>
+  <div class="grp">Marque
+    <div class="sw" id="swatches">
+      <span data-c="#2563eb" data-d="#1d4ed8" class="on" style="background:#2563eb"></span>
+      <span data-c="#16a34a" data-d="#15803d" style="background:#16a34a"></span>
+      <span data-c="#7c3aed" data-d="#6d28d9" style="background:#7c3aed"></span>
+      <span data-c="#db2777" data-d="#be185d" style="background:#db2777"></span>
+      <span data-c="#ea580c" data-d="#c2410c" style="background:#ea580c"></span>
+    </div>
+  </div>
+</div>
+<div class="note">Change le secteur et la couleur ci-dessus : l'app s'adapte (white-label + modules par secteur). Clique les onglets en bas du telephone.</div>
+
+<div class="phone"><div class="screen">
+  <div class="notch"></div>
+  <div class="appbar">
+    <div class="logo"><span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M7 9a8 8 0 0 1 0 6"/><path d="M11 7a12 12 0 0 1 0 10"/></svg></span><span id="estabName">Universite Lumiere</span></div>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+  </div>
+  <div class="body" id="body"></div>
+  <div class="tabbar" id="tabbar"></div>
+</div></div>
+
+<script>
+var state = { sector:'ecole', tab:'carte', brand:'#2563eb', brandD:'#1d4ed8', consent:false };
+
+function qrSvg(){
+  // faux QR decoratif
+  var cells='';var rng=12345;
+  for(var y=0;y<11;y++)for(var x=0;x<11;x++){rng=(rng*1103515245+12345)&0x7fffffff;if((rng>>7)%2===0){cells+='<rect x="'+(x*9)+'" y="'+(y*9)+'" width="9" height="9"/>';}}
+  return '<svg viewBox="0 0 99 99" fill="#0f172a">'+cells+'</svg>';
+}
+
+function tabs(){
+  var sectorTab = state.sector==='ecole'
+    ? {id:'campus',label:'Mon campus',icon:'<path d="M3 10l9-5 9 5-9 5z"/><path d="M6 12v4c0 1 6 3 6 3s6-2 6-3v-4"/>'}
+    : {id:'biblio',label:'Mes emprunts',icon:'<path d="M4 5h16v14H4z"/><path d="M12 5v14"/>'};
+  return [
+    {id:'carte',label:'Ma carte',icon:'<rect x="4" y="6" width="16" height="12" rx="2"/><path d="M4 10h16"/>'},
+    sectorTab,
+    {id:'bons',label:'Bons plans',icon:'<path d="M20 12l-8 8-9-9V4h7z"/><circle cx="7.5" cy="7.5" r="1.2"/>'},
+    {id:'profil',label:'Profil',icon:'<circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/>'}
+  ];
+}
+
+function renderTabs(){
+  var t=tabs();
+  document.getElementById('tabbar').innerHTML = t.map(function(x){
+    return '<button data-tab="'+x.id+'" class="'+(state.tab===x.id?'on':'')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+x.icon+'</svg>'+x.label+'</button>';
+  }).join('');
+  document.querySelectorAll('#tabbar button').forEach(function(b){
+    b.onclick=function(){state.tab=b.getAttribute('data-tab');render();};
+  });
+}
+
+function screenCarte(){
+  return '<div class="idcard">'
+    +'<div class="top"><span class="estab">'+(state.sector==='ecole'?'Universite Lumiere':'Mediatheque Centrale')+'</span><span class="badge-ok">&#10003; Active</span></div>'
+    +'<div class="who"><div class="ph">MD</div><div><div class="nm">Marie Dupont</div><div class="rl">'+(state.sector==='ecole'?'Etudiante - L3 Informatique':'Adherente')+'</div></div></div>'
+    +'<div class="meta"><div><div style="font-size:11px;opacity:.8">'+(state.sector==='ecole'?'Numero etudiant':'Numero adherent')+'</div><div class="num">ETU-2024-3815</div></div><div class="qr">'+qrSvg()+'</div></div>'
+    +'</div>'
+    +'<div style="font-size:13px;font-weight:700;margin-bottom:9px">Ajouter au telephone</div>'
+    +'<div class="wbtn">'
+    +'<button class="w-apple"><svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M16 1c0 1.4-.6 2.7-1.5 3.6-1 1-2.4 1.7-3.6 1.6-.1-1.4.6-2.8 1.5-3.7C13.3 1.6 14.8.9 16 1zM20 17.4c-.6 1.4-1 2-1.7 3.2-1 1.7-2.5 3.8-4.3 3.8-1.6 0-2-1-4.2-1s-2.7 1-4.2 1c-1.8 0-3.2-1.9-4.3-3.6C-.6 18-1 13.6 1.3 11c1-1.3 2.5-2.1 4-2.1 1.7 0 2.7 1 4.1 1 1.3 0 2.1-1 4.1-1 1.4 0 2.9.8 3.9 2-3.4 1.9-2.9 6.8 2.6 8.5z"/></svg>Apple Wallet</button>'
+    +'<button class="w-google"><svg width="15" height="15" viewBox="0 0 24 24"><path fill="#4285F4" d="M22 12c0-.7-.1-1.4-.2-2H12v4h5.6a4.8 4.8 0 0 1-2 3.2v2.6h3.3C20.7 18 22 15.3 22 12z"/><path fill="#34A853" d="M12 22c2.7 0 5-1 6.6-2.6l-3.3-2.6c-.9.6-2 .9-3.3.9-2.6 0-4.7-1.7-5.5-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.5 13.6a6 6 0 0 1 0-3.2V7.8H3.1a10 10 0 0 0 0 8.4z"/><path fill="#EA4335" d="M12 6.4c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.8l3.4 2.6C7.3 8 9.4 6.4 12 6.4z"/></svg>Google Wallet</button>'
+    +'</div>'
+    +'<p style="font-size:11.5px;color:#94a3b8;margin-top:6px">Presente ton telephone sur les lecteurs sans contact, comme une carte bancaire.</p>';
+}
+
+function li(icon,title,sub,right){
+  return '<div class="card"><div class="row"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg></div>'
+    +'<div style="flex:1"><div class="li-title">'+title+'</div><div class="li-sub">'+sub+'</div></div>'+(right||'')+'</div></div>';
+}
+
+function screenCampus(){
+  return '<h2 class="t">Mon campus</h2><p class="s">Aujourd\'hui, mardi</p>'
+    +'<div style="font-size:12px;font-weight:700;color:#94a3b8;margin:4px 0 8px;text-transform:uppercase;letter-spacing:.5px">Emploi du temps</div>'
+    +li('<circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/>','Algorithmique','08:30 - 10:30 &middot; Amphi B','<span class="pill pill-blue">En cours</span>')
+    +li('<circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/>','Base de donnees','11:00 - 13:00 &middot; Salle 204','')
+    +'<div style="font-size:12px;font-weight:700;color:#94a3b8;margin:14px 0 8px;text-transform:uppercase;letter-spacing:.5px">Infos & activites</div>'
+    +li('<path d="M4 5h16v12H4z"/><path d="M4 9h16"/>','Fermeture exceptionnelle','La BU ferme a 18h vendredi','')
+    +li('<path d="M8 2v4M16 2v4M3 10h18M5 6h14v14H5z"/>','Forum des metiers','Jeudi 14h &middot; Hall principal','<span class="pill pill-green">Nouveau</span>');
+}
+
+function screenBiblio(){
+  return '<h2 class="t">Mes emprunts</h2><p class="s">2 livres empruntes</p>'
+    +'<div class="card"><div class="row"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4z"/><path d="M12 5v14"/></svg></div><div style="flex:1"><div class="li-title">Clean Code</div><div class="li-sub">R. C. Martin</div></div><span class="pill pill-green">A rendre dans 9j</span></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:11px;font-size:12px;color:#64748b"><span>Emprunte le 02/06 &middot; Retour le 16/06</span><button class="smallbtn">Prolonger</button></div></div>'
+    +'<div class="card"><div class="row"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4z"/><path d="M12 5v14"/></svg></div><div style="flex:1"><div class="li-title">Sapiens</div><div class="li-sub">Y. N. Harari</div></div><span class="pill pill-red">En retard</span></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:11px;font-size:12px;color:#64748b"><span>Emprunte le 12/05 &middot; Retour le 09/06</span><button class="smallbtn">Prolonger</button></div></div>'
+    +'<p style="font-size:11.5px;color:#94a3b8;margin-top:4px">Synchronise avec le systeme de pret de la mediatheque.</p>';
+}
+
+function screenBons(){
+  var consentUi = state.consent ? '' :
+    '<div class="consent"><div class="row"><div style="flex:1"><div class="li-title">Activer les bons plans</div><div class="li-sub" style="margin-top:3px">Recevoir des offres partenaires. Facultatif, desactivable a tout moment (RGPD).</div></div><div class="toggle" id="consentToggle"></div></div></div>';
+  if(!state.consent){
+    return '<h2 class="t">Bons plans</h2><p class="s">Des offres pour les etudiants</p>'+consentUi
+      +'<div style="text-align:center;color:#94a3b8;font-size:13px;padding:30px 10px">Active les bons plans ci-dessus pour decouvrir les offres partenaires.</div>';
+  }
+  return '<h2 class="t">Bons plans</h2><p class="s">Rien que pour toi</p>'
+    +dealCard('Spotify Premium','-50% pendant 3 mois','ETUD50')
+    +dealCard('Cinema Pathe','Place a 6,90&euro;','CAMPUS690')
+    +dealCard('Fnac','-15% sur les fournitures','RENTREE15');
+}
+function dealCard(p,o,code){
+  return '<div class="card"><div class="row"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12l-8 8-9-9V4h7z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg></div><div style="flex:1"><div class="li-title">'+p+'</div><div class="li-sub">'+o+'</div></div></div>'
+    +'<div class="codebox"><span class="code">'+code+'</span><button class="smallbtn">Copier</button></div></div>';
+}
+
+function screenProfil(){
+  return '<h2 class="t">Profil</h2><p class="s">Marie Dupont</p>'
+    +'<div class="card"><div class="li-sub">Etablissement</div><div class="li-title">'+(state.sector==='ecole'?'Universite Lumiere':'Mediatheque Centrale')+'</div></div>'
+    +'<div class="card"><div class="li-sub">Email</div><div class="li-title">marie.dupont@etu.fr</div></div>'
+    +'<div class="card"><div class="row"><div style="flex:1"><div class="li-title">Recevoir les bons plans</div><div class="li-sub" style="margin-top:2px">Consentement marketing (RGPD)</div></div><div class="toggle" id="consentToggle" style="background:'+(state.consent?'var(--brand)':'#cbd5e1')+'"></div></div></div>'
+    +'<button class="bigbtn" style="background:#fff;color:#dc2626;border:1px solid #fecaca">Se deconnecter</button>';
+}
+
+function render(){
+  var b=document.getElementById('body');
+  document.getElementById('estabName').textContent = state.sector==='ecole'?'Universite Lumiere':'Mediatheque Centrale';
+  var html='';
+  if(state.tab==='carte') html=screenCarte();
+  else if(state.tab==='campus') html=screenCampus();
+  else if(state.tab==='biblio') html=screenBiblio();
+  else if(state.tab==='bons') html=screenBons();
+  else if(state.tab==='profil') html=screenProfil();
+  b.innerHTML=html;
+  renderTabs();
+  var ct=document.getElementById('consentToggle');
+  if(ct) ct.onclick=function(){state.consent=!state.consent;render();};
+}
+
+document.querySelectorAll('#sectorSeg button').forEach(function(btn){
+  btn.onclick=function(){
+    document.querySelectorAll('#sectorSeg button').forEach(function(x){x.classList.remove('on')});
+    btn.classList.add('on');
+    state.sector=btn.getAttribute('data-sector');
+    state.tab='carte';
+    render();
+  };
+});
+document.querySelectorAll('#swatches span').forEach(function(s){
+  s.onclick=function(){
+    document.querySelectorAll('#swatches span').forEach(function(x){x.classList.remove('on')});
+    s.classList.add('on');
+    state.brand=s.getAttribute('data-c');state.brandD=s.getAttribute('data-d');
+    document.documentElement.style.setProperty('--brand',state.brand);
+    document.documentElement.style.setProperty('--brand-d',state.brandD);
+  };
+});
+render();
+</script>
+</body>
+</html>

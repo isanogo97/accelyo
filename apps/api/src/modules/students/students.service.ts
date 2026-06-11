@@ -17,6 +17,7 @@
  */
 
 import { encrypt, decrypt, hashSearchable } from '@accelyo/crypto';
+import { issueActivation } from '../student-auth/student-auth.service';
 import { AuditAction, type Student, type ImportResult } from '@accelyo/shared';
 import type { Request } from 'express';
 import { getEnv } from '../../config/env';
@@ -76,6 +77,9 @@ export async function createStudent(
       program: input.program ?? null,
     },
   });
+
+  // Lien d'activation de l'app etudiant (e-mail best-effort, ne bloque pas).
+  await issueActivation(created.id, input.email);
 
   return decryptStudent(created);
 }

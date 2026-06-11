@@ -39,6 +39,9 @@ model University {
   domain         String         @unique
   siret          String?
   deploymentMode DeploymentMode @default(CLOUD)
+  sector         Sector         @default(SCHOOL)
+  brandColor     String         @default("#2563eb")
+  logoUrl        String?
   // JSONB - chiffre applicativement avant insertion (cle AES-256-GCM).
   nfcConfig      Json?
   izlyConfig     Json?
@@ -103,6 +106,13 @@ model Student {
 
   enrollmentYear    Int
   program           String?
+  // Authentification etudiant (app mobile). L'etudiant n'est pas un User:
+  // son acces vit ici et se coupe si isActive=false (suspension admin).
+  passwordHash             String?
+  activationToken          String?   @unique
+  activationTokenExpiresAt DateTime?
+  activatedAt              DateTime?
+  marketingConsent         Boolean   @default(false)
   // Hash de la photo (SHA-256) - la photo elle-meme est dans MinIO.
   photoHash         String?
   isActive          Boolean    @default(true)
@@ -225,6 +235,13 @@ model AuditLog {
 // =================================================================
 // Enums
 // =================================================================
+
+enum Sector {
+  SCHOOL
+  LIBRARY
+  COMPANY
+  ASSOCIATION
+}
 
 enum Role {
   SUPER_ADMIN

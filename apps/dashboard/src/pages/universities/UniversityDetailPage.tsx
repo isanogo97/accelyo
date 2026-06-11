@@ -83,6 +83,25 @@ export function UniversityDetailPage() {
     },
   });
 
+  const updateBranding = useMutation({
+    mutationFn: async (input: {
+      sector: string;
+      brandColor: string;
+      logoUrl: string | null;
+    }) => {
+      const r = await api.put(`/universities/${id}`, {
+        sector: input.sector,
+        brandColor: input.brandColor,
+        // logoUrl optionnel: on n'envoie le champ que s'il est renseigne.
+        ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}),
+      });
+      return r.data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['university', id] });
+    },
+  });
+
   if (univ.isLoading) return <div>Chargement...</div>;
   if (!univ.data) return <div>Universite introuvable</div>;
 
@@ -105,6 +124,22 @@ export function UniversityDetailPage() {
         />
         <Stat label="Lecteurs" value={stats.data?.readers ?? '...'} />
       </div>
+
+      {/* Identite visuelle / branding */}
+      <BrandingCard
+        sector={univ.data.sector ?? 'SCHOOL'}
+        brandColor={univ.data.brandColor ?? '#2563eb'}
+        logoUrl={univ.data.logoUrl ?? null}
+        onSubmit={(v) => updateBranding.mutate(v)}
+        submitting={updateBranding.isPending}
+        saved={updateBranding.isSuccess}
+        error={
+          updateBranding.error
+            ? (updateBranding.error as { response?: { data?: { error?: { message?: string } } } })
+                .response?.data?.error?.message ?? 'Erreur'
+            : null
+        }
+      />
 
       {/* Admins */}
       <div className="card p-6">
@@ -214,6 +249,132 @@ function Stat({ label, value }: { label: string; value: string | number }) {
         {label}
       </div>
       <div className="text-2xl font-semibold mt-1">{value}</div>
+    </div>
+  );
+}
+
+const SECTORS: Array<{ value: string; label: string }> = [
+  { value: 'SCHOOL', label: 'Etablissement scolaire' },
+  { value: 'LIBRARY', label: 'Bibliotheque' },
+  { value: 'COMPANY', label: 'Entreprise' },
+  { value: 'ASSOCIATION', label: 'Association' },
+];
+
+function BrandingCard(props: {
+  sector: string;
+  brandColor: string;
+  logoUrl: string | null;
+  onSubmit: (v: {
+    sector: string;
+    brandColor: string;
+    logoUrl: string | null;
+  }) => void;
+  submitting: boolean;
+  saved: boolean;
+  error: string | null;
+}) {
+  const [sector, setSector] = useState(props.sector);
+  const [brandColor, setBrandColor] = useState(props.brandColor);
+  const [logoUrl, setLogoUrl] = useState(props.logoUrl ?? '');
+
+  return (
+    <div className="card p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium">Identite visuelle</h2>
+        <div
+          className="h-8 w-8 rounded-full border border-slate-200"
+          style={{ backgroundColor: brandColor }}
+          title={brandColor}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-xs text-slate-600 mb-1">Secteur</label>
+          <select
+            className="input"
+            value={sector}
+            onChange={(e) => setSector(e.target.value)}
+          >
+            {SECTORS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs text-slate-600 mb-1">
+            Couleur de marque
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={brandColor}
+              onChange={(e) => setBrandColor(e.target.value)}
+              className="h-9 w-12 rounded border border-slate-200 bg-white p-0.5"
+              aria-label="Couleur de marque"
+            />
+            <input
+              className="input flex-1"
+              type="text"
+              value={brandColor}
+              onChange={(e) => setBrandColor(e.target.value)}
+              placeholder="#2563eb"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs text-slate-600 mb-1">
+            URL du logo
+          </label>
+          <input
+            className="input"
+            type="url"
+            value={logoUrl}
+            onChange={(e) => setLogoUrl(e.target.value)}
+            placeholder="https://exemple.fr/logo.png"
+          />
+        </div>
+      </div>
+
+      {logoUrl ? (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">Apercu:</span>
+          <img
+            src={logoUrl}
+            alt="Logo"
+            className="h-8 max-w-[160px] object-contain"
+          />
+        </div>
+      ) : null}
+
+      {props.error ? (
+        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+          {props.error}
+        </div>
+      ) : null}
+      {props.saved && !props.error ? (
+        <div className="text-sm text-green-700">Identite visuelle enregistree.</div>
+      ) : null}
+
+      <div className="flex justify-end">
+        <button
+          disabled={props.submitting || !/^#[0-9a-fA-F]{6}$/.test(brandColor)}
+          onClick={() =>
+            props.onSubmit({
+              sector,
+              brandColor,
+              logoUrl: logoUrl.trim() ? logoUrl.trim() : null,
+            })
+          }
+          className="btn-primary"
+        >
+          {props.submitting ? 'Enregistrement...' : 'Enregistrer'}
+        </button>
+      </div>
     </div>
   );
 }

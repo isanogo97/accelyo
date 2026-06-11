@@ -27,6 +27,7 @@ import {
   BadRequestError,
 } from '../../utils/errors';
 import { writeAudit } from '../../middleware/audit';
+import { updateGoogleWalletPassState } from '../wallet/wallet.service';
 
 /**
  * Verifie qu'un utilisateur a le droit d'operer sur cette carte.
@@ -174,6 +175,9 @@ export async function revokeCard(req: Request, cardId: string, reason: string) {
     '1',
   );
 
+  // Revocation definitive -> on expire le passe Google Wallet (best-effort).
+  await updateGoogleWalletPassState(cardId, 'EXPIRED');
+
   writeAudit(req, {
     action: AuditAction.CARD_REVOKED,
     resourceType: 'Card',
@@ -199,6 +203,8 @@ export async function suspendCard(req: Request, cardId: string, reason: string) 
     TTL.REVOKED_CARD_SECONDS,
     '1',
   );
+  // Suspension -> on grise le passe Google Wallet (best-effort).
+  await updateGoogleWalletPassState(cardId, 'INACTIVE');
   writeAudit(req, {
     action: AuditAction.CARD_SUSPENDED,
     resourceType: 'Card',
@@ -219,6 +225,8 @@ export async function reactivateCard(req: Request, cardId: string) {
     data: { status: CardStatus.ACTIVE },
   });
   await getRedis().del(KEY.revokedCard(cardId));
+  // Reactivation -> on reactive le passe Google Wallet (best-effort).
+  await updateGoogleWalletPassState(cardId, 'ACTIVE');
   writeAudit(req, {
     action: AuditAction.CARD_REACTIVATED,
     resourceType: 'Card',

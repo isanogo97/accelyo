@@ -1,98 +1,90 @@
 /**
- * Ecran de connexion etudiant.
- * Login simplifie - email + mot de passe (ou magic link).
+ * Ecran de connexion etudiant (email + mot de passe).
  */
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { api } from '../../services/apiClient';
-import { useAuthStore } from '../../store/authStore';
+import { View, Text, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { login, errorMessage } from '../../services/studentApi';
+import { useSessionStore } from '../../store/sessionStore';
 import { saveSecure, STORAGE_KEYS } from '../../utils/keychain';
+import { Field, PrimaryButton, ErrorText } from '../../components/ui';
+import { palette } from '../../theme/theme';
 
-export function LoginScreen() {
+export function LoginScreen({ onGoToActivate }: { onGoToActivate: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const setTokens = useAuthStore((s) => s.setTokens);
+  const [loading, setLoading] = useState(false);
+  const setSessionToken = useSessionStore((s) => s.setToken);
 
   const onLogin = async () => {
     setError(null);
+    if (!email.trim() || !password) {
+      setError('Email et mot de passe requis.');
+      return;
+    }
+    setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
-      const tokens = data.data.tokens;
-      if (!tokens) {
-        setError('MFA requise - non disponible sur mobile');
-        return;
-      }
-      setTokens(tokens);
-      await saveSecure(STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken);
-      await saveSecure(STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken);
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: { message?: string } } } };
-      setError(err.response?.data?.error?.message ?? 'Erreur');
+      const token = await login(email.trim(), password);
+      await saveSecure(STORAGE_KEYS.ACCESS_TOKEN, token);
+      setSessionToken(token);
+    } catch (e) {
+      setError(errorMessage(e, 'Identifiants invalides.'));
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <View style={styles.root}>
-      <Text style={styles.title}>Accelyo</Text>
-      <Text style={styles.subtitle}>Ta carte etudiante, dans ta poche.</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email universitaire"
-        placeholderTextColor="#94A3B8"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Mot de passe"
-        placeholderTextColor="#94A3B8"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <TouchableOpacity style={styles.btn} onPress={onLogin}>
-        <Text style={styles.btnText}>Se connecter</Text>
-      </TouchableOpacity>
-    </View>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.inner}>
+        <Text style={styles.brand}>Accelyo</Text>
+        <Text style={styles.tagline}>Ta carte etudiante, dans ta poche.</Text>
+
+        <Field
+          label="Email"
+          placeholder="prenom.nom@etu.fr"
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+        />
+        <Field
+          label="Mot de passe"
+          placeholder="Ton mot de passe"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+
+        <ErrorText>{error}</ErrorText>
+        <PrimaryButton label="Se connecter" onPress={onLogin} loading={loading} />
+
+        <Text style={styles.switch} onPress={onGoToActivate}>
+          Premiere connexion ? Activer mon compte
+        </Text>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-    padding: 24,
-    justifyContent: 'center',
-  },
-  title: { color: 'white', fontSize: 32, fontWeight: '700', textAlign: 'center' },
-  subtitle: {
-    color: '#94A3B8',
+  root: { flex: 1, backgroundColor: palette.bg },
+  inner: { flex: 1, padding: 24, justifyContent: 'center' },
+  brand: { fontSize: 32, fontWeight: '800', color: palette.text, textAlign: 'center' },
+  tagline: {
+    color: palette.textMuted,
     textAlign: 'center',
-    marginBottom: 32,
     marginTop: 4,
+    marginBottom: 28,
   },
-  input: {
-    backgroundColor: '#1E293B',
-    color: 'white',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  btn: {
-    backgroundColor: '#2563EB',
-    paddingVertical: 14,
-    borderRadius: 8,
-    marginTop: 12,
-  },
-  btnText: {
-    color: 'white',
+  switch: {
+    color: palette.textMuted,
     textAlign: 'center',
+    marginTop: 18,
     fontWeight: '600',
   },
-  error: { color: '#FCA5A5', marginBottom: 8 },
 });

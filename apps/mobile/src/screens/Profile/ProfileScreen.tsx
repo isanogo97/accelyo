@@ -1,48 +1,87 @@
 /**
- * Profil etudiant + redirection Izly + gestion des appareils.
+ * Onglet "Profil".
+ * ----------------------------------------------------------------
+ * Infos etudiant + etablissement, toggle de consentement marketing
+ * (RGPD, appelle /me/consent) et bouton de deconnexion (efface le
+ * token securise et reinitialise la session).
  */
-import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
-import { api } from '../../services/apiClient';
-import { useAuthStore } from '../../store/authStore';
-import { deleteSecure, STORAGE_KEYS } from '../../utils/keychain';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ScreenTitle, Card } from '../../components/ui';
+import { Toggle } from '../../components/Toggle';
+import { palette } from '../../theme/theme';
+import type { MeResponse } from '../../services/studentApi';
 
-export function ProfileScreen() {
-  const clear = useAuthStore((s) => s.clear);
-
-  const onIzly = async () => {
-    try {
-      const { data } = await api.get('/izly/redirect');
-      const url = data.data.url ?? data.data.webFallback;
-      if (url) Linking.openURL(url);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const onLogout = async () => {
-    await deleteSecure(STORAGE_KEYS.ACCESS_TOKEN);
-    await deleteSecure(STORAGE_KEYS.REFRESH_TOKEN);
-    clear();
-  };
+export function ProfileScreen({
+  me,
+  consent,
+  onToggleConsent,
+  consentBusy,
+  onLogout,
+}: {
+  me: MeResponse;
+  consent: boolean;
+  onToggleConsent: (next: boolean) => void;
+  consentBusy?: boolean;
+  onLogout: () => void;
+}) {
+  const { student, establishment } = me;
+  const fullName = `${student.firstName} ${student.lastName}`;
 
   return (
-    <View style={styles.root}>
-      <Text style={styles.title}>Mon compte</Text>
-      <TouchableOpacity style={styles.btn} onPress={onIzly}>
-        <Text style={styles.btnText}>Payer a la cantine (Izly)</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.btnSecondary} onPress={onLogout}>
-        <Text style={styles.btnSecondaryText}>Deconnexion</Text>
+    <View>
+      <ScreenTitle title="Profil" subtitle={fullName} />
+
+      <Card>
+        <Text style={styles.label}>Etablissement</Text>
+        <Text style={styles.value}>{establishment.name}</Text>
+      </Card>
+
+      <Card>
+        <Text style={styles.label}>Email</Text>
+        <Text style={styles.value}>{student.email}</Text>
+      </Card>
+
+      <Card>
+        <Text style={styles.label}>Numero etudiant</Text>
+        <Text style={styles.value}>{student.studentNumber}</Text>
+      </Card>
+
+      <Card>
+        <Text style={styles.label}>Annee d'inscription</Text>
+        <Text style={styles.value}>{student.enrollmentYear}</Text>
+      </Card>
+
+      <Card>
+        <View style={styles.row}>
+          <View style={styles.rowText}>
+            <Text style={styles.value}>Recevoir les bons plans</Text>
+            <Text style={styles.subtle}>Consentement marketing (RGPD)</Text>
+          </View>
+          <Toggle value={consent} onValueChange={onToggleConsent} disabled={consentBusy} />
+        </View>
+      </Card>
+
+      <TouchableOpacity style={styles.logoutBtn} onPress={onLogout} activeOpacity={0.85}>
+        <Text style={styles.logoutText}>Se deconnecter</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0F172A', padding: 24, paddingTop: 80 },
-  title: { color: 'white', fontSize: 24, fontWeight: '700', marginBottom: 24 },
-  btn: { backgroundColor: '#2563EB', padding: 14, borderRadius: 8, marginBottom: 12 },
-  btnText: { color: 'white', textAlign: 'center', fontWeight: '600' },
-  btnSecondary: { backgroundColor: '#1E293B', padding: 14, borderRadius: 8 },
-  btnSecondaryText: { color: '#94A3B8', textAlign: 'center' },
+  label: { fontSize: 12.5, color: palette.textMuted },
+  value: { fontSize: 14.5, fontWeight: '700', color: palette.text, marginTop: 2 },
+  subtle: { fontSize: 12.5, color: palette.textMuted, marginTop: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rowText: { flex: 1 },
+  logoutBtn: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 11,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  logoutText: { color: palette.danger, fontWeight: '700', fontSize: 14 },
 });
