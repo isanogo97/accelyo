@@ -26,6 +26,8 @@ import {
 import { emailSchema } from '@accelyo/validators';
 import { hashPassword } from '@accelyo/crypto';
 import { prisma } from '../../config/database';
+import { getEnv } from '../../config/env';
+import { sendEmail } from '../../services/emailService';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
 import { writeAudit } from '../../middleware/audit';
@@ -34,6 +36,34 @@ import { ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors
 
 const router = Router();
 router.use(requireAuth);
+
+/**
+ * Envoie le mot de passe provisoire a un admin par e-mail (best-effort).
+ * Retourne true si l'envoi a reussi.
+ */
+async function emailTempPassword(
+  email: string,
+  temporaryPassword: string,
+): Promise<boolean> {
+  const env = getEnv();
+  const link = env.DASHBOARD_URL.replace(/\/$/, '') + '/app/login';
+  try {
+    await sendEmail({
+      to: email,
+      subject: 'Votre acces administrateur Accelyo',
+      text:
+        'Bonjour,\n\n' +
+        'Un compte administrateur Accelyo a ete cree pour vous.\n' +
+        'Connectez-vous ici : ' + link + '\n' +
+        'Email : ' + email + '\n' +
+        'Mot de passe provisoire : ' + temporaryPassword + '\n\n' +
+        'Pour votre securite, un nouveau mot de passe vous sera demande a la premiere connexion.\n',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** Liste de toutes les universites - SUPER_ADMIN uniquement. */
 router.get('/', requireRole(Role.SUPER_ADMIN), async (_req, res, next) => {
@@ -241,6 +271,7 @@ router.post(
           role: body.role,
           universityId,
           isActive: true,
+          mustChangePassword: true,
         },
         select: {
           id: true,
@@ -259,7 +290,12 @@ router.post(
         metadata: { universityId, role: body.role },
       });
 
-      respondCreated(res, { user, temporaryPassword });
+      // On envoie le mot de passe par e-mail plutot que de l'afficher.
+      const emailed = await emailTempPassword(body.email, temporaryPassword);
+      respondCreated(
+        res,
+        emailed ? { user, emailed } : { user, emailed, temporaryPassword },
+      );
     } catch (e) {
       next(e);
     }
@@ -331,6 +367,43 @@ router.delete(
         where: { id: String(req.params.contactId) },
       });
       respondNoContent(res);
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+/**
+ * Reinitialise le mot de passe d'un admin (SUPER_ADMIN).
+ * Genere un nouveau mot de passe provisoire, force le changement a la
+ * prochaine connexion, et l'envoie par e-mail. En cas d'echec d'envoi,
+ * le mot de passe est renvoye dans la reponse (fallback).
+ */
+router.post(
+  '/:id/admins/:userId/reset-password',
+  requireRole(Role.SUPER_ADMIN),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = String(req.params.userId);
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundError('Utilisateur introuvable');
+
+      const temporaryPassword = randomBytes(8).toString('hex') + 'A!9';
+      const passwordHash = await hashPassword(temporaryPassword);
+      await prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash, mustChangePassword: true, failedAttempts: 0, lockedUntil: null },
+      });
+
+      writeAudit(req, {
+        action: AuditAction.USER_PASSWORD_RESET,
+        resourceType: 'User',
+        resourceId: userId,
+        metadata: { by: 'super_admin' },
+      });
+
+      const emailed = await emailTempPassword(user.email, temporaryPassword);
+      respondOk(res, emailed ? { emailed } : { emailed, temporaryPassword });
     } catch (e) {
       next(e);
     }

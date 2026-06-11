@@ -31,6 +31,7 @@ router.get(
           role: true,
           universityId: true,
           mfaEnabled: true,
+          mustChangePassword: true,
           lastLoginAt: true,
           isActive: true,
           university: {

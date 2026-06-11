@@ -84,6 +84,8 @@ model User {
   // Si renseigne, le compte est verrouille jusqu'a cette date.
   lockedUntil    DateTime?
   isActive       Boolean     @default(true)
+  // Force le changement de mot de passe a la premiere connexion (compte cree par un admin).
+  mustChangePassword Boolean @default(false)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 

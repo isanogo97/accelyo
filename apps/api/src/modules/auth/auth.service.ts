@@ -44,6 +44,7 @@ export interface LoginResult {
     role: string;
     universityId: string | null;
     mfaEnabled: boolean;
+    mustChangePassword: boolean;
   };
 }
 
@@ -112,6 +113,7 @@ export async function login(
     role: user.role,
     universityId: user.universityId,
     mfaEnabled: user.mfaEnabled,
+    mustChangePassword: user.mustChangePassword,
   };
 
   // Si MFA active, on n'emet PAS encore d'access token.
@@ -307,7 +309,7 @@ export async function changePassword(
   const newHash = await hashPassword(newPassword);
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash: newHash },
+    data: { passwordHash: newHash, mustChangePassword: false },
   });
 
   writeAudit(req, {

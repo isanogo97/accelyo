@@ -11,6 +11,7 @@ export interface Me {
   role: 'SUPER_ADMIN' | 'UNIVERSITY_ADMIN' | 'UNIVERSITY_STAFF' | 'STUDENT';
   universityId: string | null;
   mfaEnabled: boolean;
+  mustChangePassword: boolean;
   lastLoginAt: string | null;
   isActive: boolean;
   university: {

@@ -9,9 +9,12 @@
  *   - Liste des admins/staff
  *   - Bouton "Creer un compte admin"
  *
- * ATTENTION: La creation d'admin renvoie un mot de passe temporaire
- * affiche UNE SEULE FOIS. En production, ce mot de passe devra etre
- * envoye par email a l'admin et ne JAMAIS s'afficher dans le dashboard.
+ * Flux mot de passe admin:
+ *   - A la creation d'un admin, l'API envoie par e-mail le mot de passe
+ *     provisoire (emailed: true). En fallback (envoi echoue), elle renvoie
+ *     temporaryPassword a communiquer manuellement.
+ *   - Un super-admin peut reinitialiser le mot de passe d'un admin existant
+ *     (POST /admins/:userId/reset-password), meme logique e-mail/fallback.
  */
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -52,7 +55,14 @@ export function UniversityDetailPage() {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [createdAdminCreds, setCreatedAdminCreds] = useState<{
     email: string;
-    password: string;
+    emailed: boolean;
+    password: string | null;
+  } | null>(null);
+  // Resultat de la reinitialisation de mot de passe d'un admin existant.
+  const [resetResult, setResetResult] = useState<{
+    email: string;
+    emailed: boolean;
+    password: string | null;
   } | null>(null);
 
   const univ = useQuery({
@@ -100,16 +110,42 @@ export function UniversityDetailPage() {
       const r = await api.post(`/universities/${id}/admins`, input);
       return r.data.data as {
         user: { email: string };
-        temporaryPassword: string;
+        emailed: boolean;
+        // Present uniquement en fallback (envoi d'e-mail echoue).
+        temporaryPassword?: string;
       };
     },
     onSuccess: (data) => {
       setCreatedAdminCreds({
         email: data.user.email,
-        password: data.temporaryPassword,
+        emailed: data.emailed,
+        password: data.emailed ? null : data.temporaryPassword ?? null,
       });
       setShowAdminModal(false);
       qc.invalidateQueries({ queryKey: ['university', id, 'admins'] });
+    },
+  });
+
+  // Reinitialisation du mot de passe d'un admin (super-admin uniquement).
+  const resetPassword = useMutation({
+    mutationFn: async (input: { userId: string; email: string }) => {
+      const r = await api.post(
+        `/universities/${id}/admins/${input.userId}/reset-password`,
+      );
+      return {
+        email: input.email,
+        result: r.data.data as {
+          emailed: boolean;
+          temporaryPassword?: string;
+        },
+      };
+    },
+    onSuccess: ({ email, result }) => {
+      setResetResult({
+        email,
+        emailed: result.emailed,
+        password: result.emailed ? null : result.temporaryPassword ?? null,
+      });
     },
   });
 
@@ -248,12 +284,13 @@ export function UniversityDetailPage() {
               <th className="py-2">Role</th>
               <th className="py-2">MFA</th>
               <th className="py-2">Derniere connexion</th>
+              <th className="py-2"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {admins.data?.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-6 text-slate-500">
+                <td colSpan={5} className="py-6 text-slate-500">
                   Aucun admin - creez le premier.
                 </td>
               </tr>
@@ -274,11 +311,37 @@ export function UniversityDetailPage() {
                       ? new Date(a.lastLoginAt).toLocaleString('fr-FR')
                       : '-'}
                   </td>
+                  <td className="py-2 text-right">
+                    <button
+                      onClick={() =>
+                        resetPassword.mutate({ userId: a.id, email: a.email })
+                      }
+                      disabled={
+                        resetPassword.isPending &&
+                        resetPassword.variables?.userId === a.id
+                      }
+                      className="text-sm text-blue-600 hover:underline disabled:opacity-50"
+                    >
+                      {resetPassword.isPending &&
+                      resetPassword.variables?.userId === a.id
+                        ? 'Reinitialisation...'
+                        : 'Reinitialiser le mot de passe'}
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+
+        {/* Erreur de reinitialisation (en dehors d'une ligne) */}
+        {resetPassword.error ? (
+          <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+            {(resetPassword.error as {
+              response?: { data?: { error?: { message?: string } } };
+            }).response?.data?.error?.message ?? 'Erreur'}
+          </div>
+        ) : null}
       </div>
 
       {/* Modale creation admin */}
@@ -297,32 +360,96 @@ export function UniversityDetailPage() {
         />
       ) : null}
 
-      {/* Affichage one-shot du mot de passe temporaire */}
+      {/* Resultat de la creation d'admin */}
       {createdAdminCreds ? (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg w-full max-w-md p-6 space-y-3">
             <h2 className="text-lg font-semibold text-green-700">
               Admin cree
             </h2>
-            <p className="text-sm text-slate-600">
-              Communique ces identifiants a l'administrateur.
-              <br />
-              <strong>Ce mot de passe ne sera plus affiche.</strong>
-            </p>
             <div className="bg-slate-50 border border-slate-200 rounded p-3 text-sm font-mono space-y-1">
               <div>
                 Email: <span className="font-bold">{createdAdminCreds.email}</span>
               </div>
-              <div>
-                MDP temp:{' '}
-                <span className="font-bold">{createdAdminCreds.password}</span>
-              </div>
             </div>
+            {createdAdminCreds.emailed ? (
+              <p className="text-sm text-slate-600">
+                Un e-mail a ete envoye a l'administrateur avec son mot de passe
+                provisoire.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600">
+                  Communique ce mot de passe a l'administrateur.
+                  <br />
+                  <strong>Ce mot de passe ne sera plus affiche.</strong>
+                </p>
+                <div className="bg-slate-50 border border-slate-200 rounded p-3 text-sm font-mono">
+                  <div>
+                    MDP temp:{' '}
+                    <span className="font-bold">
+                      {createdAdminCreds.password}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-600">
+                  (l'envoi d'e-mail a echoue, communiquez-le manuellement)
+                </p>
+              </>
+            )}
             <button
               onClick={() => setCreatedAdminCreds(null)}
               className="btn-primary w-full"
             >
-              J'ai note - fermer
+              {createdAdminCreds.emailed ? 'Fermer' : "J'ai note - fermer"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Resultat de la reinitialisation de mot de passe */}
+      {resetResult ? (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-md p-6 space-y-3">
+            <h2 className="text-lg font-semibold text-green-700">
+              Mot de passe reinitialise
+            </h2>
+            <div className="bg-slate-50 border border-slate-200 rounded p-3 text-sm font-mono space-y-1">
+              <div>
+                Email: <span className="font-bold">{resetResult.email}</span>
+              </div>
+            </div>
+            {resetResult.emailed ? (
+              <p className="text-sm text-slate-600">
+                Un e-mail a ete envoye a l'administrateur avec son mot de passe
+                provisoire.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm text-slate-600">
+                  Communique ce mot de passe a l'administrateur.
+                  <br />
+                  <strong>Ce mot de passe ne sera plus affiche.</strong>
+                </p>
+                <div className="bg-slate-50 border border-slate-200 rounded p-3 text-sm font-mono">
+                  <div>
+                    MDP temp:{' '}
+                    <span className="font-bold">{resetResult.password}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-600">
+                  (l'envoi d'e-mail a echoue, communiquez-le manuellement)
+                </p>
+              </>
+            )}
+            <button
+              onClick={() => {
+                setResetResult(null);
+                resetPassword.reset();
+              }}
+              className="btn-primary w-full"
+            >
+              {resetResult.emailed ? 'Fermer' : "J'ai note - fermer"}
             </button>
           </div>
         </div>

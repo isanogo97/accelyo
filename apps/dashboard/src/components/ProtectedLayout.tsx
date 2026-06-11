@@ -1,15 +1,12 @@
 /**
  * Layout des pages authentifiees.
- * ----------------------------------------------------------------
- * Comportement:
- *   - Redirige /login si pas d'access token ni refresh token.
- *   - Affiche la nav laterale adaptee au role.
- *   - Affiche un BANNER en haut indiquant le contexte tenant courant.
- *
- * NE PAS RETIRER le banner - il evite les erreurs operationnelles type
- * "je pense gerer la Sorbonne mais je suis dans Sciences Po".
+ * - Redirige /login si pas de token.
+ * - Si mustChangePassword: ecran bloquant de changement de mot de passe.
+ * - Sinon: nav laterale + banner contexte tenant.
  */
+import { useState } from 'react';
 import { Outlet, NavLink, Navigate, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useMe } from '../api/me';
 import { api } from '../api/client';
@@ -29,6 +26,99 @@ const NAV_BASE = [
   { to: '/settings', label: 'Parametres', roles: 'ALL' as const },
 ];
 
+function ForcedPasswordChange({ email }: { email: string }) {
+  const qc = useQueryClient();
+  const { logout } = useAuthStore();
+  const navigate = useNavigate();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (next !== confirm) {
+      setError('Les deux nouveaux mots de passe ne correspondent pas.');
+      return;
+    }
+    if (next.length < 12) {
+      setError('Le nouveau mot de passe doit faire au moins 12 caracteres.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post('/auth/password', {
+        currentPassword: current,
+        newPassword: next,
+      });
+      await qc.invalidateQueries({ queryKey: ['me'] });
+    } catch (err: unknown) {
+      const e2 = err as {
+        response?: { data?: { error?: { message?: string } } };
+      };
+      setError(e2.response?.data?.error?.message ?? 'Echec du changement.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+      <form onSubmit={submit} className="card p-7 w-full max-w-md space-y-3">
+        <h1 className="text-xl font-semibold">Definissez votre mot de passe</h1>
+        <p className="text-sm text-slate-600">
+          Bienvenue {email}. Pour votre securite, choisissez un nouveau mot de
+          passe avant d'acceder a votre espace (min 12 caracteres).
+        </p>
+        <input
+          className="input w-full"
+          type="password"
+          autoComplete="current-password"
+          placeholder="Mot de passe provisoire (recu par e-mail)"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+        />
+        <input
+          className="input w-full"
+          type="password"
+          autoComplete="new-password"
+          placeholder="Nouveau mot de passe"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+        />
+        <input
+          className="input w-full"
+          type="password"
+          autoComplete="new-password"
+          placeholder="Confirmer le nouveau mot de passe"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+        />
+        {error ? <div className="text-red-600 text-sm">{error}</div> : null}
+        <button
+          type="submit"
+          disabled={loading || !current || !next || !confirm}
+          className="btn-primary w-full disabled:opacity-50"
+        >
+          {loading ? 'Enregistrement...' : 'Definir et continuer'}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            logout();
+            navigate('/login');
+          }}
+          className="text-slate-500 text-sm underline w-full"
+        >
+          Se deconnecter
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export function ProtectedLayout() {
   const { accessToken, refreshToken, logout } = useAuthStore();
   const navigate = useNavigate();
@@ -36,6 +126,10 @@ export function ProtectedLayout() {
 
   if (!accessToken && !refreshToken) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (me?.mustChangePassword) {
+    return <ForcedPasswordChange email={me.email} />;
   }
 
   const onLogout = async () => {
@@ -58,7 +152,6 @@ export function ProtectedLayout() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Banner contexte tenant - ne PAS retirer (cf comments). */}
       {me ? (
         <div
           className={`px-6 py-2 text-xs font-medium flex items-center justify-between ${
