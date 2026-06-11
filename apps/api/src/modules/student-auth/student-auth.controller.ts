@@ -16,6 +16,7 @@ import {
   issueActivation,
 } from './student-auth.service';
 import { buildGoogleWalletSaveUrl } from '../wallet/wallet.service';
+import { issueCard } from '../cards/cards.service';
 import { prisma } from '../../config/database';
 import { getEnv } from '../../config/env';
 import { respondOk } from '../../utils/respond';
@@ -28,7 +29,7 @@ export async function postActivate(
 ) {
   try {
     const body = studentActivateSchema.parse(req.body);
-    respondOk(res, await activate(body.token, body.password));
+    respondOk(res, await activate(req, body.token, body.password));
   } catch (e) {
     next(e);
   }
@@ -82,6 +83,12 @@ export async function getMyWalletGoogle(
 ) {
   try {
     if (!req.student) throw new Error('auth required');
+    // S'assurer qu'une carte existe avant de generer le passe (best-effort).
+    try {
+      await issueCard(req, { studentId: req.student.id });
+    } catch {
+      // carte deja active.
+    }
     respondOk(res, { saveUrl: await buildGoogleWalletSaveUrl(req.student.id) });
   } catch (e) {
     next(e);

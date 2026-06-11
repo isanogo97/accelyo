@@ -8,6 +8,7 @@
  * (ENT: CAS/OIDC) pourra se brancher par-dessus sans tout refaire.
  */
 import { randomBytes } from 'crypto';
+import type { Request } from 'express';
 import jwt from 'jsonwebtoken';
 import {
   hashPassword,
@@ -18,6 +19,7 @@ import {
 import { prisma } from '../../config/database';
 import { getEnv } from '../../config/env';
 import { sendEmail } from '../../services/emailService';
+import { issueCard } from '../cards/cards.service';
 import { logger } from '../../utils/logger';
 import {
   UnauthorizedError,
@@ -87,6 +89,7 @@ export async function issueActivation(
 }
 
 export async function activate(
+  req: Request,
   token: string,
   password: string,
 ): Promise<{ token: string }> {
@@ -112,6 +115,15 @@ export async function activate(
       activationTokenExpiresAt: null,
     },
   });
+
+  // Emission automatique de la carte a l'activation (best-effort:
+  // si une carte active existe deja, issueCard leve un conflit qu'on ignore).
+  try {
+    await issueCard(req, { studentId: student.id });
+  } catch {
+    // carte deja active - rien a faire.
+  }
+
   return { token: issueStudentToken(student.id) };
 }
 
