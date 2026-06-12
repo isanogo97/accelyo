@@ -7,7 +7,7 @@
  * Conçu "pluggable": ce mode mot-de-passe marche partout. Un mode SSO
  * (ENT: CAS/OIDC) pourra se brancher par-dessus sans tout refaire.
  */
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import type { Request } from 'express';
 import jwt from 'jsonwebtoken';
 import {
@@ -19,7 +19,10 @@ import {
 import { prisma } from '../../config/database';
 import { getEnv } from '../../config/env';
 import { sendEmail } from '../../services/emailService';
-import { getPresignedUrl } from '../../services/storageService';
+import {
+  getPresignedUrl,
+  uploadPhoto,
+} from '../../services/storageService';
 import { issueCard } from '../cards/cards.service';
 import { logger } from '../../utils/logger';
 import {
@@ -166,7 +169,7 @@ export async function login(
  * La photo est une donnee perso: elle n'est servie QUE via une URL
  * presignee courte ci-dessous, et JAMAIS publiquement / sur un passe.
  */
-function studentPhotoKey(studentId: string): string {
+export function studentPhotoKey(studentId: string): string {
   return `photos/${studentId}`;
 }
 
@@ -221,6 +224,54 @@ export async function getMe(studentId: string) {
     },
     marketingConsent: student.marketingConsent,
   };
+}
+
+/**
+ * Formats d'image acceptes pour la photo etudiant (carte).
+ */
+export const ALLOWED_PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+/**
+ * Stocke (ou remplace) la photo d'un etudiant dans MinIO sous la cle
+ * deterministe `photos/<studentId>` et met a jour `photoHash` (sha256 hex
+ * du contenu) pour invalider/identifier l'image. Renvoie une URL presignee
+ * courte (~300s) vers la nouvelle photo.
+ *
+ * Mutualise par l'upload self-service (etudiant) et l'upload admin.
+ */
+export async function storeStudentPhoto(
+  studentId: string,
+  buffer: Buffer,
+  mime: string,
+): Promise<{ photoUrl: string }> {
+  if (!ALLOWED_PHOTO_TYPES.includes(mime)) {
+    throw new BadRequestError(
+      'Format non supporte (png, jpeg ou webp uniquement)',
+    );
+  }
+
+  const objectKey = studentPhotoKey(studentId);
+  await uploadPhoto(objectKey, buffer, mime);
+
+  const photoHash = createHash('sha256').update(buffer).digest('hex');
+  await prisma.student.update({
+    where: { id: studentId },
+    data: { photoHash },
+  });
+
+  const photoUrl = await getPresignedUrl(objectKey, 300);
+  return { photoUrl };
+}
+
+/**
+ * Upload self-service de la photo de l'etudiant connecte.
+ */
+export async function uploadMyPhoto(
+  studentId: string,
+  buffer: Buffer,
+  mime: string,
+): Promise<{ photoUrl: string }> {
+  return storeStudentPhoto(studentId, buffer, mime);
 }
 
 export async function setConsent(

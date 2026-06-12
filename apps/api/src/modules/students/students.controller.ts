@@ -14,8 +14,11 @@ import {
   gdprDeleteStudent,
   importStudents,
 } from './students.service';
+import { storeStudentPhoto } from '../student-auth/student-auth.service';
 import { respondCreated, respondOk, respondNoContent } from '../../utils/respond';
-import { BadRequestError } from '../../utils/errors';
+import { BadRequestError, NotFoundError } from '../../utils/errors';
+import { writeAudit } from '../../middleware/audit';
+import { AuditAction } from '@accelyo/shared';
 
 export async function postStudent(req: Request, res: Response, next: NextFunction) {
   try {
@@ -72,6 +75,50 @@ export async function getStudent(req: Request, res: Response, next: NextFunction
       return next(new (await import('../../utils/errors')).NotFoundError());
     }
     respondOk(res, out);
+  } catch (e) {
+    next(e);
+  }
+}
+
+/**
+ * Upload admin de la photo (carte) d'un etudiant.
+ * Multipart, champ "file" (png/jpeg/webp, <= 3 Mo). Reponse: { photoUrl }.
+ *
+ * Isolation tenant: on charge l'etudiant et on verifie qu'il appartient a
+ * l'universite de l'admin (404 hors perimetre, comme getStudent). Le
+ * SUPER_ADMIN est exempte.
+ */
+export async function postStudentPhoto(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const id = String(req.params.id);
+    const student = await findStudentById(id);
+    if (
+      req.auth?.role !== 'SUPER_ADMIN' &&
+      student.universityId !== req.auth?.universityId
+    ) {
+      // 404 plutot que 403: ne pas confirmer l'existence d'un id hors perimetre.
+      throw new NotFoundError();
+    }
+
+    const file = (
+      req as Request & { file?: { buffer: Buffer; mimetype: string } }
+    ).file;
+    if (!file) throw new BadRequestError('Fichier manquant (champ "file")');
+
+    const result = await storeStudentPhoto(id, file.buffer, file.mimetype);
+
+    writeAudit(req, {
+      action: AuditAction.STUDENT_UPDATED,
+      resourceType: 'Student',
+      resourceId: id,
+      metadata: { photo: true },
+    });
+
+    respondOk(res, result);
   } catch (e) {
     next(e);
   }

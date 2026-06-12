@@ -17,7 +17,11 @@
  */
 
 import { encrypt, decrypt, hashSearchable } from '@accelyo/crypto';
-import { issueActivation } from '../student-auth/student-auth.service';
+import {
+  issueActivation,
+  studentPhotoKey,
+} from '../student-auth/student-auth.service';
+import { getPresignedUrl } from '../../services/storageService';
 import { AuditAction, type Student, type ImportResult } from '@accelyo/shared';
 import type { Request } from 'express';
 import { getEnv } from '../../config/env';
@@ -113,13 +117,14 @@ export async function findStudents(opts: {
     }),
     prisma.student.count({ where }),
   ]);
-  return { items: rows.map(decryptStudent), total };
+  const items = await Promise.all(rows.map(withPhotoUrl));
+  return { items, total };
 }
 
 export async function findStudentById(id: string): Promise<Student> {
   const row = await prisma.student.findUnique({ where: { id } });
   if (!row) throw new NotFoundError('Etudiant introuvable');
-  return decryptStudent(row);
+  return withPhotoUrl(row);
 }
 
 /**
@@ -201,6 +206,24 @@ export async function importStudents(
   });
 
   return { totalRows: rows.length, inserted, updated, errors };
+}
+
+/**
+ * Vue admin enrichie: dechiffre les champs + genere une URL presignee courte
+ * (~300s) vers la photo si `photoHash` est present (sinon `photoUrl: null`).
+ * Une URL presignee differente est emise a chaque appel (donnee perso).
+ */
+async function withPhotoUrl(row: Parameters<typeof decryptStudent>[0]): Promise<Student> {
+  const dto = decryptStudent(row);
+  if (row.photoHash) {
+    try {
+      dto.photoUrl = await getPresignedUrl(studentPhotoKey(row.id), 300);
+    } catch {
+      // MinIO indisponible / objet absent -> on degrade en null.
+      dto.photoUrl = null;
+    }
+  }
+  return dto;
 }
 
 /** Helper - dechiffre un row Prisma vers le DTO Student public. */

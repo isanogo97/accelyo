@@ -766,6 +766,56 @@
     var st = me.student || {}, est = me.establishment || {}, card = me.card || null;
     header(view, 'Profil', null);
 
+    // ----- Ma photo (upload self-service, same-origin) -----
+    var photoBlock = el('div', 'profile-block');
+    var pb = el('div', 'photo-block');
+    var thumb = el('div', 'photo-thumb');
+    var hasPhoto = !!st.photoUrl;
+    if (hasPhoto) {
+      var pimg = el('img');
+      pimg.alt = 'Votre photo de profil';
+      pimg.onerror = function () {
+        thumb.classList.add('fallback');
+        thumb.textContent = initialsOf(st);
+      };
+      pimg.src = st.photoUrl;
+      thumb.appendChild(pimg);
+    } else {
+      thumb.classList.add('fallback');
+      thumb.setAttribute('aria-hidden', 'true');
+      thumb.textContent = initialsOf(st);
+    }
+
+    var side = el('div', 'photo-side');
+    side.appendChild(el('div', 'photo-label', 'Ma photo'));
+    var pbtn = el('button', 'photo-btn', hasPhoto ? 'Changer ma photo' : 'Ajouter une photo');
+    pbtn.type = 'button';
+    pbtn.setAttribute('aria-label', hasPhoto ? 'Changer ma photo' : 'Ajouter une photo');
+
+    var pinput = el('input');
+    pinput.type = 'file';
+    pinput.accept = 'image/png,image/jpeg,image/webp';
+    pinput.className = 'hidden';
+    pinput.style.display = 'none';
+    pinput.setAttribute('aria-hidden', 'true');
+    pinput.tabIndex = -1;
+
+    pbtn.onclick = function () { pinput.click(); };
+    pinput.onchange = function () {
+      var file = pinput.files && pinput.files[0];
+      if (file) uploadPhoto(file, pbtn);
+      pinput.value = '';
+    };
+
+    side.appendChild(pbtn);
+    side.appendChild(el('div', 'photo-hint', 'PNG, JPEG ou WebP, 3 Mo maximum.'));
+    pb.appendChild(thumb);
+    pb.appendChild(side);
+    photoBlock.appendChild(pb);
+    photoBlock.appendChild(pinput);
+    view.appendChild(photoBlock);
+
+
     function row(k, v) {
       if (v == null || v === '') return '';
       return '<div class="profile-row"><span class="k">' + esc(k) + '</span><span class="v">' + esc(v) + '</span></div>';
@@ -824,6 +874,46 @@
     }).catch(function () {
       input.disabled = false; input.checked = !want;
       toast('Echec de la mise a jour.', 'err');
+    });
+  }
+
+  // Upload de la photo etudiant (multipart/form-data, champ 'file').
+  // Validation client (type + taille), puis rechargement de /me.
+  function uploadPhoto(file, btn) {
+    var MAX = 3 * 1024 * 1024; // 3 Mo
+    var TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+    if (TYPES.indexOf(file.type) === -1) {
+      toast('Format non supporte. Choisissez une image PNG, JPEG ou WebP.', 'err');
+      return;
+    }
+    if (file.size > MAX) {
+      toast('Image trop lourde (3 Mo maximum).', 'err');
+      return;
+    }
+    var prev = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Envoi...';
+    var fd = new FormData();
+    fd.append('file', file);
+    // NB : on ne fixe PAS Content-Type, le navigateur pose la boundary multipart.
+    fetch(API + '/student-auth/me/photo', {
+      method: 'POST',
+      headers: jwt ? { 'Authorization': 'Bearer ' + jwt } : {},
+      body: fd
+    }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; },
+        function () { return { ok: r.ok, status: r.status, data: null }; });
+    }).then(function (res) {
+      if (!res.ok || !res.data || !res.data.data) {
+        throw new Error(errMsg(res, "Echec de l'envoi de la photo."));
+      }
+      // Recharge /me pour rafraichir le Profil ET la carte.
+      return enterApp().then(function () {
+        selectTab('profil');
+        toast('Photo mise a jour.', 'ok');
+      });
+    }).catch(function (err) {
+      btn.disabled = false; btn.textContent = prev;
+      toast(err.message || "Echec de l'envoi de la photo.", 'err');
     });
   }
 

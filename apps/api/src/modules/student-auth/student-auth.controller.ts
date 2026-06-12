@@ -15,6 +15,7 @@ import {
   setConsent,
   issueActivation,
   linkPhysicalCard,
+  uploadMyPhoto,
 } from './student-auth.service';
 import { buildGoogleWalletSaveUrl } from '../wallet/wallet.service';
 import {
@@ -63,6 +64,37 @@ export async function getMeHandler(
   try {
     if (!req.student) throw new Error('auth required');
     respondOk(res, await getMe(req.student.id));
+  } catch (e) {
+    next(e);
+  }
+}
+
+/**
+ * Upload self-service de la photo (carte) de l'etudiant connecte.
+ * Multipart, champ "file" (png/jpeg/webp, <= 3 Mo). Reponse: { photoUrl }.
+ */
+export async function postMyPhoto(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.student) throw new Error('auth required');
+    const file = (req as Request & { file?: { buffer: Buffer; mimetype: string } })
+      .file;
+    if (!file) throw new BadRequestError('Fichier manquant (champ "file")');
+    const result = await uploadMyPhoto(
+      req.student.id,
+      file.buffer,
+      file.mimetype,
+    );
+    writeAudit(req, {
+      action: AuditAction.STUDENT_UPDATED,
+      resourceType: 'Student',
+      resourceId: req.student.id,
+      metadata: { photo: true },
+    });
+    respondOk(res, result);
   } catch (e) {
     next(e);
   }

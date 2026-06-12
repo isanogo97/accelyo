@@ -10,6 +10,7 @@ import {
   getStudent,
   deleteStudent,
   postImport,
+  postStudentPhoto,
 } from './students.controller';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole, requireSameUniversity } from '../../middleware/rbac';
@@ -19,6 +20,12 @@ import { limiterStudentImport } from '../../middleware/rateLimiter';
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// Upload photo etudiant: memoire + limite 3 Mo (type valide dans le service).
+const uploadStudentPhoto = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 },
 });
 
 const router = Router();
@@ -48,6 +55,13 @@ router.get(
   '/:id',
   requireRole(Role.UNIVERSITY_ADMIN, Role.UNIVERSITY_STAFF),
   getStudent,
+);
+router.post(
+  '/:id/photo',
+  requireRole(Role.UNIVERSITY_ADMIN, Role.UNIVERSITY_STAFF),
+  requireSameUniversity(),
+  uploadStudentPhoto.single('file'),
+  postStudentPhoto,
 );
 router.delete(
   '/:id/gdpr-delete',

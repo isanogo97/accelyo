@@ -10,6 +10,7 @@
  *   POST /resend/:studentId-> admin: renvoyer le lien d'activation
  */
 import { Router } from 'express';
+import multer from 'multer';
 import { Role } from '@accelyo/shared';
 import { requireAuth } from '../../middleware/auth';
 import { requireRole } from '../../middleware/rbac';
@@ -24,7 +25,14 @@ import {
   getMyWalletGoogle,
   getMyWalletApple,
   postPhysicalCard,
+  postMyPhoto,
 } from './student-auth.controller';
+
+// Upload photo etudiant: memoire + limite 3 Mo (type valide dans le service).
+const uploadPhotoFile = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 },
+});
 
 const router = Router();
 
@@ -34,6 +42,12 @@ router.post('/login', limiterAuthLogin, postLogin);
 router.get('/me', requireStudentAuth, getMeHandler);
 router.patch('/me/consent', requireStudentAuth, patchConsent);
 router.post('/me/physical-card', requireStudentAuth, postPhysicalCard);
+router.post(
+  '/me/photo',
+  requireStudentAuth,
+  uploadPhotoFile.single('file'),
+  postMyPhoto,
+);
 router.get('/me/wallet/google', requireStudentAuth, getMyWalletGoogle);
 router.get('/me/wallet/apple', requireStudentAuth, getMyWalletApple);
 
