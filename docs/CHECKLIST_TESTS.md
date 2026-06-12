@@ -63,6 +63,15 @@
 - [ ] Mapping étudiant↔badge (CSV/API) ou lecture UID
 - [ ] Double fonctionnement carte physique + téléphone
 
+## J. Module Contenu + rôle Éditeur + équipe (v1.6.0)
+- [ ] Admin/Éditeur : onglet **Contenu** → créer/éditer/supprimer Planning, Infos, Bibliothèque, Bons plans
+- [ ] Le contenu créé apparaît dans l'app étudiante (onglets correspondants)
+- [ ] Admin établissement : page **Équipe** → inviter un **Éditeur** (e-mail mdp provisoire) ; Bloquer / Débloquer / Réinitialiser / Supprimer
+- [ ] Connexion **Éditeur** → ne voit QUE « Contenu » + « Paramètres » (pas Étudiants/Cartes/etc.)
+- [ ] Éditeur bloqué (isActive=false) → ne peut plus se connecter
+- [ ] Cloisonnement : un admin/éditeur ne voit/gère QUE le contenu et l'équipe de SON établissement
+- [ ] Super-admin : sélecteur d'établissement pour gérer contenu/équipe de n'importe quel tenant
+
 ## I. À nettoyer avant prod réelle
 - [ ] Supprimer les 12 établissements de démo (seed) + données fictives
 - [ ] Vérifier qu'aucune donnée de test ne traîne
