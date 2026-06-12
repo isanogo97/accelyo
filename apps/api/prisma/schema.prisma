@@ -129,6 +129,10 @@ model Student {
   marketingConsent         Boolean   @default(false)
   // Hash de la photo (SHA-256) - la photo elle-meme est dans MinIO.
   photoHash         String?
+  // UID de la carte physique existante (numero de serie NFC) lie au compte.
+  // Stocke en clair (peu sensible, lisibilite admin) + hash pour recherche/dedup.
+  physicalCardUid     String?
+  physicalCardUidHash String?
   isActive          Boolean    @default(true)
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
@@ -143,6 +147,7 @@ model Student {
   @@unique([universityId, studentNumberHash])
   @@unique([universityId, emailHash])
   @@index([universityId])
+  @@index([universityId, physicalCardUidHash])
 }
 
 // -----------------------------------------------------------------

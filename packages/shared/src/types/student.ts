@@ -23,6 +23,8 @@ export interface Student {
   program: string | null;
   /** URL signee MinIO si la photo a ete uploadee, sinon null. */
   photoUrl: string | null;
+  /** UID de la carte physique liee (clair normalise) ou null. */
+  physicalCardUid: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -44,6 +46,8 @@ export interface StudentRow {
   enrollmentYear: number;
   program: string | null;
   photoHash: string | null;
+  physicalCardUid: string | null;
+  physicalCardUidHash: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

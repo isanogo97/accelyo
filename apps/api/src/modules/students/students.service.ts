@@ -214,6 +214,7 @@ function decryptStudent(row: {
   enrollmentYear: number;
   program: string | null;
   photoHash: string | null;
+  physicalCardUid: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -230,6 +231,7 @@ function decryptStudent(row: {
     program: row.program,
     // photoUrl est genere a la demande par MinIO presigned URL.
     photoUrl: null,
+    physicalCardUid: row.physicalCardUid,
     isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

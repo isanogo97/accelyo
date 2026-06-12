@@ -14,6 +14,7 @@ import {
   getMe,
   setConsent,
   issueActivation,
+  linkPhysicalCard,
 } from './student-auth.service';
 import { buildGoogleWalletSaveUrl } from '../wallet/wallet.service';
 import {
@@ -24,7 +25,9 @@ import { issueCard } from '../cards/cards.service';
 import { prisma } from '../../config/database';
 import { getEnv } from '../../config/env';
 import { respondOk } from '../../utils/respond';
-import { NotFoundError } from '../../utils/errors';
+import { NotFoundError, BadRequestError } from '../../utils/errors';
+import { writeAudit } from '../../middleware/audit';
+import { AuditAction } from '@accelyo/shared';
 
 export async function postActivate(
   req: Request,
@@ -75,6 +78,33 @@ export async function patchConsent(
     const body = studentConsentSchema.parse(req.body);
     await setConsent(req.student.id, body.marketingConsent);
     respondOk(res, { marketingConsent: body.marketingConsent });
+  } catch (e) {
+    next(e);
+  }
+}
+
+/**
+ * Lie l'UID de la carte physique existante (scannee depuis l'app) au compte.
+ * Body: { uid: string }. Reponse: { physicalCardUid } (clair normalise).
+ */
+export async function postPhysicalCard(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.student) throw new Error('auth required');
+    const uid = (req.body as { uid?: unknown })?.uid;
+    if (typeof uid !== 'string') {
+      throw new BadRequestError('UID de carte requis');
+    }
+    const result = await linkPhysicalCard(req.student.id, uid);
+    writeAudit(req, {
+      action: AuditAction.STUDENT_UPDATED,
+      resourceType: 'Student',
+      resourceId: req.student.id,
+    });
+    respondOk(res, result);
   } catch (e) {
     next(e);
   }

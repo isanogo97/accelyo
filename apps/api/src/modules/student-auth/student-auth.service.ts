@@ -201,6 +201,8 @@ export async function getMe(studentId: string) {
       program: student.program,
       // URL presignee courte (donnee perso) ou null si pas de photo.
       photoUrl,
+      // UID de la carte physique liee (clair normalise) ou null.
+      physicalCardUid: student.physicalCardUid,
     },
     card: student.card
       ? {
@@ -229,4 +231,39 @@ export async function setConsent(
     where: { id: studentId },
     data: { marketingConsent: consent },
   });
+}
+
+/**
+ * Lie l'UID d'une carte physique existante au compte de l'etudiant courant.
+ * Utilise pour la migration d'un parc de cartes: l'etudiant scanne sa vieille
+ * carte NFC depuis l'app et l'UID est rattache a son compte.
+ *
+ * L'UID est normalise (hex MAJUSCULES, sans separateurs) et valide comme un
+ * UID NFC plausible (4 a 10 octets => 8 a 20 caracteres hex). On stocke l'UID
+ * en clair (peu sensible, lisible cote admin) + un hash deterministe pour la
+ * recherche/deduplication. Idempotent: un nouvel appel ecrase le precedent.
+ */
+export async function linkPhysicalCard(
+  studentId: string,
+  rawUid: string,
+): Promise<{ physicalCardUid: string }> {
+  // Normalisation: on retire tout separateur usuel et on met en MAJUSCULES.
+  const uid = String(rawUid ?? '')
+    .replace(/[\s:.-]/g, '')
+    .toUpperCase();
+
+  // UID NFC: hexadecimal, 4 a 10 octets => 8 a 20 caracteres hex.
+  if (!/^[0-9A-F]{8,20}$/.test(uid) || uid.length % 2 !== 0) {
+    throw new BadRequestError('UID de carte invalide');
+  }
+
+  const env = getEnv();
+  const physicalCardUidHash = hashSearchable(uid, env.ENCRYPTION_KEY);
+
+  await prisma.student.update({
+    where: { id: studentId },
+    data: { physicalCardUid: uid, physicalCardUidHash },
+  });
+
+  return { physicalCardUid: uid };
 }

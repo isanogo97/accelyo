@@ -44,6 +44,8 @@ export interface Student {
   email: string;
   enrollmentYear: number;
   program: string;
+  /** UID (hex MAJUSCULES) de la carte physique liee au compte, ou null. */
+  physicalCardUid?: string | null;
 }
 
 export type CardStatus = 'ACTIVE' | 'PENDING' | 'EXPIRED' | 'REVOKED' | string;
@@ -103,4 +105,19 @@ export async function fetchGoogleWalletUrl(): Promise<string> {
     '/student-auth/me/wallet/google',
   );
   return data.data.saveUrl;
+}
+
+/**
+ * Lie une carte etudiante PHYSIQUE existante (parc deja deploye) au
+ * compte courant, a partir de l'UID lu en NFC (hex MAJUSCULES, 8-20
+ * caracteres). Renvoie l'UID enregistre cote serveur.
+ */
+export async function linkPhysicalCard(
+  uid: string,
+): Promise<{ physicalCardUid: string }> {
+  const { data } = await studentApi.post<ApiEnvelope<{ physicalCardUid: string }>>(
+    '/student-auth/me/physical-card',
+    { uid },
+  );
+  return data.data;
 }
