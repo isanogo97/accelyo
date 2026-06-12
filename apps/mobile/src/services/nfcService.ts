@@ -1,61 +1,60 @@
 /**
- * Service NFC HCE (Host Card Emulation).
+ * Service NFC HCE (Host Card Emulation) Accelyo.
  * ----------------------------------------------------------------
- * Sur Android, on emule une carte Mifare via le module HCE de
- * react-native-nfc-manager. Le telephone repond aux APDUs envoyes
- * par les lecteurs Elatec en mode lecteur (ISO 14443-4).
+ * Android: VRAI HCE via le module natif local `accelyo-hce`
+ *   (HostApduService Kotlin). Le telephone repond aux APDU des lecteurs
+ *   Elatec (ISO 14443-4) meme app en arriere-plan. Protocole partage:
+ *   docs/NFC_HCE_PROTOCOL.md (AID Accelyo, SELECT -> 9000, READ -> card_uid).
  *
- * Sur iOS (MISE A JOUR 2026):
- *   - Depuis l'ouverture du NFC par Apple dans l'EEE (engagements UE,
- *     iOS 17.4+), l'emulation est possible via l'entitlement
- *     'NFC & SE Platform' (API CardSession). Accelyo etant une entite
- *     EEE, c'est la voie cible pour le badge NFC iPhone (cf.
- *     docs/APPLE_NFC_SE_ENTITLEMENT_GUIDE.md et docs/NFC_HCE_PROTOCOL.md).
- *   - En attendant l'entitlement: QR code de fallback (in-app + Wallet).
+ * iOS: badge NFC possible via l'entitlement Apple "NFC & SE Platform"
+ *   (EEE, API CardSession) - cf. docs/APPLE_NFC_SE_ENTITLEMENT_GUIDE.md.
+ *   En attendant l'entitlement: QR code de fallback (UI).
  *
- * NE PAS modifier le format de la reponse APDU sans coordonner avec
- * la configuration deployee dans les lecteurs Elatec - sinon les
- * cartes ne seront plus reconnues.
+ * NE PAS changer le format de la reponse APDU sans re-provisionner les
+ * lecteurs Elatec, sinon les cartes ne seront plus reconnues.
  */
-
-import NfcManager from 'react-native-nfc-manager';
+import { Platform } from 'react-native';
 import type { CardPayload } from '@accelyo/shared';
+import * as Hce from '../../modules/accelyo-hce';
 
 class AccelyoNfcService {
   private active = false;
+  private preparedToken: string | null = null;
+  private preparedPayload: CardPayload | null = null;
+
+  /** Le badge NFC natif est-il disponible sur cet appareil (Android + HCE) ? */
+  isSupported(): boolean {
+    return Platform.OS === 'android' && Hce.isHceSupported();
+  }
 
   /**
-   * Initialise le NFC manager et active l'emulation pour la carte.
+   * Arme la carte. Sur Android compatible, active le HCE natif (le tap
+   * fonctionne face a un lecteur Elatec). Sinon, la carte reste "armee"
+   * cote app (la carte visuelle / QR reste disponible).
    * @param signedToken JWT RS256 signe par l'API.
-   * @param payload Payload decode (utile pour l'UID Mifare).
+   * @param payload Payload decode (fournit le card_uid transmis au lecteur).
    */
   async startHCE(signedToken: string, payload: CardPayload): Promise<void> {
-    try {
-      await NfcManager.start();
-      this.active = true;
-      // ATTENTION: Implementation HCE specifique - voir la doc
-      // react-native-nfc-manager pour la configuration des AID
-      // Android (Application IDs). En l'absence d'AID custom, le
-      // telephone se comporte comme une carte Mifare standard.
-      //
-      // Pour l'instant on prepare la reponse APDU - la lib gere
-      // automatiquement les events HCE Android via le manifest.
-      this.preparedToken = signedToken;
-      this.preparedPayload = payload;
-    } catch (err) {
-      console.error('[nfc] start HCE failed', err);
-      throw err;
+    this.preparedToken = signedToken;
+    this.preparedPayload = payload;
+    this.active = true;
+    if (Platform.OS === 'android' && Hce.isHceSupported()) {
+      // Option A (cf. spec): on transmet le card_uid; le lecteur valide en ligne.
+      Hce.setCard(payload.card_uid);
     }
   }
 
   async stopHCE(): Promise<void> {
-    if (!this.active) return;
-    try {
-      await NfcManager.cancelTechnologyRequest().catch(() => undefined);
-      this.active = false;
-    } catch (err) {
-      console.error('[nfc] stop HCE failed', err);
+    if (Platform.OS === 'android') {
+      try {
+        Hce.clearCard();
+      } catch {
+        // ignore
+      }
     }
+    this.active = false;
+    this.preparedToken = null;
+    this.preparedPayload = null;
   }
 
   isActive(): boolean {
@@ -63,18 +62,13 @@ class AccelyoNfcService {
   }
 
   /**
-   * Reponse preparee (token signe RS256 + payload) a renvoyer au lecteur
-   * Elatec via le handler d'evenement HCE Android. Renvoie null tant que
-   * l'emulation n'a pas ete demarree.
+   * Reponse preparee (token signe + payload). Utile pour le fallback QR /
+   * les ecrans qui ont besoin du card_uid courant.
    */
   getPreparedResponse(): { token: string; payload: CardPayload } | null {
     if (!this.preparedToken || !this.preparedPayload) return null;
     return { token: this.preparedToken, payload: this.preparedPayload };
   }
-
-  // Stockes en memoire pour repondre aux events HCE.
-  private preparedToken: string | null = null;
-  private preparedPayload: CardPayload | null = null;
 }
 
 export const nfcService = new AccelyoNfcService();

@@ -1,0 +1,13 @@
+apply plugin: 'expo-module-gradle-plugin'
+
+group = 'fr.accelyo.hce'
+version = '1.0.0'
+
+android {
+  namespace 'fr.accelyo.hce'
+}
+
+dependencies {
+  // Stockage chiffre du "tap payload" partage entre le module JS et le service HCE.
+  implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+}

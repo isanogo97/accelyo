@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Declaration HCE: AID proprietaire Accelyo (cf. docs/NFC_HCE_PROTOCOL.md).
+  AID = F0 41 43 43 45 4C 59 4F 01  ('F0' + "ACCELYO" + version 01).
+  category "other" (carte d'acces, pas de paiement).
+-->
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/accelyo_hce_desc"
+    android:requireDeviceUnlock="false">
+  <aid-group android:description="@string/accelyo_hce_desc" android:category="other">
+    <aid-filter android:name="F0414343454C594F01"/>
+  </aid-group>
+</host-apdu-service>

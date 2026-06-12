@@ -1,12 +1,12 @@
 /**
- * Tests du service NFC HCE (mock de react-native-nfc-manager).
+ * Tests du service NFC HCE (mock du module natif local accelyo-hce).
  */
-jest.mock('react-native-nfc-manager', () => ({
+jest.mock('../../modules/accelyo-hce', () => ({
   __esModule: true,
-  default: {
-    start: jest.fn().mockResolvedValue(undefined),
-    cancelTechnologyRequest: jest.fn().mockResolvedValue(undefined),
-  },
+  isHceSupported: jest.fn(() => true),
+  setCard: jest.fn(),
+  clearCard: jest.fn(),
+  isHceEnabled: jest.fn(() => true),
 }));
 
 import { nfcService } from '../services/nfcService';
@@ -27,7 +27,7 @@ describe('nfcService', () => {
     await nfcService.stopHCE();
   });
 
-  it('demarre l emulation et prepare la reponse HCE', async () => {
+  it('arme la carte et prepare la reponse', async () => {
     await nfcService.startHCE('signed.jwt.token', payload);
     expect(nfcService.isActive()).toBe(true);
     const prepared = nfcService.getPreparedResponse();
@@ -35,10 +35,11 @@ describe('nfcService', () => {
     expect(prepared?.payload.card_uid).toBe('04AABBCC');
   });
 
-  it('stopHCE desactive l emulation', async () => {
+  it('stopHCE desarme la carte', async () => {
     await nfcService.startHCE('t', payload);
     expect(nfcService.isActive()).toBe(true);
     await nfcService.stopHCE();
     expect(nfcService.isActive()).toBe(false);
+    expect(nfcService.getPreparedResponse()).toBeNull();
   });
 });
