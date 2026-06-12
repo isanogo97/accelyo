@@ -5,10 +5,13 @@
  * react-native-nfc-manager. Le telephone repond aux APDUs envoyes
  * par les lecteurs Elatec en mode lecteur (ISO 14443-4).
  *
- * Sur iOS:
- *   - Pas d'API HCE publique. Apple n'autorise pas l'emulation
- *     d'une carte Mifare sans accord commercial. La version iOS
- *     d'Accelyo utilise donc un QR code de fallback (a developper).
+ * Sur iOS (MISE A JOUR 2026):
+ *   - Depuis l'ouverture du NFC par Apple dans l'EEE (engagements UE,
+ *     iOS 17.4+), l'emulation est possible via l'entitlement
+ *     'NFC & SE Platform' (API CardSession). Accelyo etant une entite
+ *     EEE, c'est la voie cible pour le badge NFC iPhone (cf.
+ *     docs/APPLE_NFC_SE_ENTITLEMENT_GUIDE.md et docs/NFC_HCE_PROTOCOL.md).
+ *   - En attendant l'entitlement: QR code de fallback (in-app + Wallet).
  *
  * NE PAS modifier le format de la reponse APDU sans coordonner avec
  * la configuration deployee dans les lecteurs Elatec - sinon les
