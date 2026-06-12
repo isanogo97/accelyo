@@ -24,6 +24,8 @@ export enum Role {
   UNIVERSITY_ADMIN = 'UNIVERSITY_ADMIN',
   /** Personnel universite - lecture seule (scolarite, etc.). */
   UNIVERSITY_STAFF = 'UNIVERSITY_STAFF',
+  /** Editeur - gere uniquement le contenu (planning, infos, biblio, bons plans). */
+  CONTENT_EDITOR = 'CONTENT_EDITOR',
   /** Etudiant - voit uniquement sa propre carte. */
   STUDENT = 'STUDENT',
 }

@@ -8,7 +8,12 @@ import { api } from './client';
 export interface Me {
   id: string;
   email: string;
-  role: 'SUPER_ADMIN' | 'UNIVERSITY_ADMIN' | 'UNIVERSITY_STAFF' | 'STUDENT';
+  role:
+    | 'SUPER_ADMIN'
+    | 'UNIVERSITY_ADMIN'
+    | 'UNIVERSITY_STAFF'
+    | 'CONTENT_EDITOR'
+    | 'STUDENT';
   universityId: string | null;
   mfaEnabled: boolean;
   mustChangePassword: boolean;

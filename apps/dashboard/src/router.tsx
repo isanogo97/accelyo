@@ -18,6 +18,8 @@ import { SettingsPage } from './pages/settings/SettingsPage';
 import { UniversitiesListPage } from './pages/universities/UniversitiesListPage';
 import { UniversityDetailPage } from './pages/universities/UniversityDetailPage';
 import { ContactRequestsPage } from './pages/contact/ContactRequestsPage';
+import { ContentPage } from './pages/content/ContentPage';
+import { TeamPage } from './pages/team/TeamPage';
 
 export const router = createBrowserRouter(
   [
@@ -37,6 +39,8 @@ export const router = createBrowserRouter(
         { path: 'universities', element: <UniversitiesListPage /> },
         { path: 'universities/:id', element: <UniversityDetailPage /> },
         { path: 'contact-requests', element: <ContactRequestsPage /> },
+        { path: 'content', element: <ContentPage /> },
+        { path: 'team', element: <TeamPage /> },
         { path: 'settings', element: <SettingsPage /> },
       ],
     },

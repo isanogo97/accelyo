@@ -247,7 +247,7 @@ router.delete('/:id', requireRole(Role.SUPER_ADMIN), async (req, res, next) => {
  */
 const createAdminSchema = z.object({
   email: emailSchema,
-  role: z.enum([Role.UNIVERSITY_ADMIN, Role.UNIVERSITY_STAFF]),
+  role: z.enum([Role.UNIVERSITY_ADMIN, Role.UNIVERSITY_STAFF, Role.CONTENT_EDITOR]),
 });
 
 router.post(

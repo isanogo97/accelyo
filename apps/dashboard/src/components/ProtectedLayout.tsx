@@ -10,21 +10,64 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useMe } from '../api/me';
 import { api } from '../api/client';
+import type { Me } from '../api/me';
 
-const NAV_BASE = [
-  { to: '/overview', label: 'Tableau de bord', roles: 'ALL' as const },
-  { to: '/students', label: 'Etudiants', roles: 'ALL' as const },
-  { to: '/cards', label: 'Cartes', roles: 'ALL' as const },
-  { to: '/readers', label: 'Lecteurs NFC', roles: 'ALL' as const },
-  { to: '/audit', label: "Journal d'audit", roles: 'ALL' as const },
-  { to: '/universities', label: 'Universites', roles: 'SUPER_ADMIN' as const },
+type Role = Me['role'];
+
+/**
+ * Navigation laterale filtree par role.
+ * - `roles` absent => visible par tous les roles "back-office".
+ * - `roles` present => visible uniquement pour les roles listes.
+ * Un CONTENT_EDITOR ne voit que les items qui l'incluent explicitement
+ * (Contenu + Parametres) : il est exclu de tous les items "tous roles".
+ */
+const BACKOFFICE_ROLES: Role[] = [
+  'SUPER_ADMIN',
+  'UNIVERSITY_ADMIN',
+  'UNIVERSITY_STAFF',
+];
+
+interface NavItem {
+  to: string;
+  label: string;
+  roles?: Role[];
+}
+
+const NAV_BASE: NavItem[] = [
+  { to: '/overview', label: 'Tableau de bord' },
+  { to: '/students', label: 'Etudiants' },
+  { to: '/cards', label: 'Cartes' },
+  { to: '/readers', label: 'Lecteurs NFC' },
+  { to: '/audit', label: "Journal d'audit" },
+  {
+    to: '/content',
+    label: 'Contenu',
+    roles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'CONTENT_EDITOR'],
+  },
+  {
+    to: '/team',
+    label: 'Equipe',
+    roles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN'],
+  },
+  { to: '/universities', label: 'Universites', roles: ['SUPER_ADMIN'] },
   {
     to: '/contact-requests',
     label: 'Demandes de contact',
-    roles: 'SUPER_ADMIN' as const,
+    roles: ['SUPER_ADMIN'],
   },
-  { to: '/settings', label: 'Parametres', roles: 'ALL' as const },
+  {
+    to: '/settings',
+    label: 'Parametres',
+    roles: [...BACKOFFICE_ROLES, 'CONTENT_EDITOR'],
+  },
 ];
+
+function canSee(item: NavItem, role?: Role): boolean {
+  if (!role) return false;
+  if (item.roles) return item.roles.includes(role);
+  // Items sans restriction : reserves au back-office "classique".
+  return BACKOFFICE_ROLES.includes(role);
+}
 
 function ForcedPasswordChange({ email }: { email: string }) {
   const qc = useQueryClient();
@@ -144,9 +187,7 @@ export function ProtectedLayout() {
     navigate('/login');
   };
 
-  const nav = NAV_BASE.filter(
-    (n) => n.roles === 'ALL' || n.roles === me?.role,
-  );
+  const nav = NAV_BASE.filter((n) => canSee(n, me?.role));
 
   const isSuperAdmin = me?.role === 'SUPER_ADMIN';
 
