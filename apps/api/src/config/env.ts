@@ -54,6 +54,23 @@ const envSchema = z.object({
   GOOGLE_WALLET_ISSUER_ID: z.string().optional(),
   GOOGLE_WALLET_KEY_PATH: z.string().optional(),
 
+  // Google Wallet Smart Tap (badgeage NFC du passe sur lecteur). Optionnel:
+  // identifiant "redemption issuer / collector ID" fourni par Google APRES
+  // enrolement au programme Smart Tap. Tant qu'il est absent, le passe reste
+  // un passe visuel normal (pas de Smart Tap). Voir WALLET_NFC_BADGING.md.
+  GOOGLE_WALLET_SMART_TAP_ISSUER_ID: z.string().optional(),
+
+  // Apple Wallet NFC (badgeage du passe sur lecteur VAS/NFC). Gate derriere
+  // un flag ET une cle: le dict `nfc` n'est honore par iOS QUE si le passe
+  // est signe avec un certificat disposant de l'entitlement NFC Apple
+  // (programme ferme, sur approbation). Defaut: desactive.
+  APPLE_WALLET_NFC_ENABLED: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true'),
+  // Cle publique ECDH P-256 (base64) fournie via le programme NFC Apple.
+  APPLE_WALLET_NFC_PUBLIC_KEY: z.string().optional(),
+
   // Apple Wallet (.pkpass carte etudiante). Tous optionnels: si le
   // certificat Apple n'est pas fourni, l'endpoint /wallet/apple
   // renvoie un 503 "pas encore configure". Voir

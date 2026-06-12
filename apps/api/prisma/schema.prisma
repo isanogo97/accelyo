@@ -42,6 +42,9 @@ model University {
   sector         Sector         @default(SCHOOL)
   brandColor     String         @default("#2563eb")
   logoUrl        String?
+  // Design carte: visuel de fond (raster, servi publiquement) + couleur du texte.
+  cardBackgroundUrl String?
+  cardTextColor     String      @default("#ffffff")
   address        String?
   city           String?
   postalCode     String?

@@ -19,7 +19,7 @@
  *     (DELETE /admins/:userId, 204): l'acces est coupe et l'admin disparait
  *     de la liste (l'API ne renvoie que les admins actifs).
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
@@ -48,6 +48,8 @@ type University = {
   deploymentMode: string;
   brandColor: string | null;
   logoUrl: string | null;
+  cardBackgroundUrl: string | null;
+  cardTextColor: string | null;
   _count?: { students: number; admins: number; readers: number };
   contacts?: Contact[];
 };
@@ -171,10 +173,12 @@ export function UniversityDetailPage() {
       sector: string;
       brandColor: string;
       logoUrl: string | null;
+      cardTextColor: string;
     }) => {
       const r = await api.put(`/universities/${id}`, {
         sector: input.sector,
         brandColor: input.brandColor,
+        cardTextColor: input.cardTextColor,
         // logoUrl optionnel: on n'envoie le champ que s'il est renseigne.
         ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}),
       });
@@ -247,9 +251,16 @@ export function UniversityDetailPage() {
 
       {/* Identite visuelle / branding */}
       <BrandingCard
+        universityId={id!}
         sector={univ.data.sector ?? 'SCHOOL'}
         brandColor={univ.data.brandColor ?? '#2563eb'}
         logoUrl={univ.data.logoUrl ?? null}
+        cardBackgroundUrl={univ.data.cardBackgroundUrl ?? null}
+        cardTextColor={univ.data.cardTextColor ?? '#ffffff'}
+        universityName={univ.data.name}
+        onRefresh={() =>
+          qc.invalidateQueries({ queryKey: ['university', id] })
+        }
         onSubmit={(v) => updateBranding.mutate(v)}
         submitting={updateBranding.isPending}
         saved={updateBranding.isSuccess}
@@ -797,14 +808,115 @@ const SECTORS: Array<{ value: string; label: string }> = [
   { value: 'ASSOCIATION', label: 'Association' },
 ];
 
+// Contraintes alignees sur l'API (multer + validation serveur).
+const BRANDING_MAX_BYTES = 3 * 1024 * 1024; // 3 Mo
+const BRANDING_ACCEPT = 'image/png,image/jpeg,image/webp';
+const BRANDING_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+/**
+ * Valide un fichier image cote client avant envoi.
+ * Renvoie un message d'erreur lisible, ou null si le fichier est valide.
+ */
+function validateImageFile(file: File): string | null {
+  if (!BRANDING_ALLOWED_TYPES.includes(file.type)) {
+    return 'Format non supporte. Utilisez un fichier PNG, JPEG ou WebP.';
+  }
+  if (file.size > BRANDING_MAX_BYTES) {
+    return 'Fichier trop volumineux (3 Mo maximum).';
+  }
+  return null;
+}
+
+/**
+ * Sous-composant: bouton d'upload d'une image de branding (logo ou fond).
+ * - input file cache + bouton stylise
+ * - validation client (type + taille) avant envoi
+ * - FormData (champ "file"), Content-Type multipart laisse a axios
+ * - etat chargement/erreur, callback onUploaded(url) au succes
+ */
+function ImageUploadButton(props: {
+  universityId: string;
+  endpoint: 'logo' | 'card-bg';
+  label: string;
+  onUploaded: (url: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = async (file: File) => {
+    setError(null);
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      // On ne force PAS Content-Type: axios pose la boundary multipart.
+      const r = await api.post(
+        `/universities/${props.universityId}/branding/${props.endpoint}`,
+        form,
+      );
+      const url = r.data?.data?.url as string | undefined;
+      if (url) props.onUploaded(url);
+    } catch (e) {
+      const msg = (e as {
+        response?: { data?: { error?: { message?: string } } };
+      }).response?.data?.error?.message;
+      setError(msg ?? "Echec de l'envoi. Reessayez.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <input
+        ref={inputRef}
+        type="file"
+        accept={BRANDING_ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleFile(file);
+          // Reset pour permettre de re-selectionner le meme fichier.
+          e.target.value = '';
+        }}
+      />
+      <button
+        type="button"
+        disabled={uploading}
+        onClick={() => inputRef.current?.click()}
+        className="btn-secondary disabled:opacity-50"
+      >
+        {uploading ? 'Envoi en cours...' : props.label}
+      </button>
+      {error ? (
+        <div className="text-xs text-red-600">{error}</div>
+      ) : (
+        <p className="text-xs text-slate-400">PNG, JPEG ou WebP - 3 Mo max.</p>
+      )}
+    </div>
+  );
+}
+
 function BrandingCard(props: {
+  universityId: string;
   sector: string;
   brandColor: string;
   logoUrl: string | null;
+  cardBackgroundUrl: string | null;
+  cardTextColor: string;
+  universityName: string;
+  onRefresh: () => void;
   onSubmit: (v: {
     sector: string;
     brandColor: string;
     logoUrl: string | null;
+    cardTextColor: string;
   }) => void;
   submitting: boolean;
   saved: boolean;
@@ -812,12 +924,17 @@ function BrandingCard(props: {
 }) {
   const [sector, setSector] = useState(props.sector);
   const [brandColor, setBrandColor] = useState(props.brandColor);
-  const [logoUrl, setLogoUrl] = useState(props.logoUrl ?? '');
+  const [cardTextColor, setCardTextColor] = useState(props.cardTextColor);
+
+  // Apercus pilotes par les valeurs renvoyees par le serveur (rafraichies
+  // via invalidation), avec fallback optimiste sur l'URL renvoyee a l'upload.
+  const [logoPreview, setLogoPreview] = useState(props.logoUrl ?? '');
+  const [bgPreview, setBgPreview] = useState(props.cardBackgroundUrl ?? '');
 
   return (
-    <div className="card p-6 space-y-4">
+    <div className="card p-6 space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">Identite visuelle</h2>
+        <h2 className="text-lg font-medium">Design de la carte</h2>
         <div
           className="h-8 w-8 rounded-full border border-slate-200"
           style={{ backgroundColor: brandColor }}
@@ -825,68 +942,177 @@ function BrandingCard(props: {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-xs text-slate-600 mb-1">Secteur</label>
-          <select
-            className="input"
-            value={sector}
-            onChange={(e) => setSector(e.target.value)}
-          >
-            {SECTORS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Colonne 1: secteur + couleurs */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">Secteur</label>
+            <select
+              className="input"
+              value={sector}
+              onChange={(e) => setSector(e.target.value)}
+            >
+              {SECTORS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div>
-          <label className="block text-xs text-slate-600 mb-1">
-            Couleur de marque
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={brandColor}
-              onChange={(e) => setBrandColor(e.target.value)}
-              className="h-9 w-12 rounded border border-slate-200 bg-white p-0.5"
-              aria-label="Couleur de marque"
-            />
-            <input
-              className="input flex-1"
-              type="text"
-              value={brandColor}
-              onChange={(e) => setBrandColor(e.target.value)}
-              placeholder="#2563eb"
-            />
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">
+              Couleur de marque
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={brandColor}
+                onChange={(e) => setBrandColor(e.target.value)}
+                className="h-9 w-12 rounded border border-slate-200 bg-white p-0.5"
+                aria-label="Couleur de marque"
+              />
+              <input
+                className="input flex-1"
+                type="text"
+                value={brandColor}
+                onChange={(e) => setBrandColor(e.target.value)}
+                placeholder="#2563eb"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">
+              Couleur du texte de la carte
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={cardTextColor}
+                onChange={(e) => setCardTextColor(e.target.value)}
+                className="h-9 w-12 rounded border border-slate-200 bg-white p-0.5"
+                aria-label="Couleur du texte de la carte"
+              />
+              <input
+                className="input flex-1"
+                type="text"
+                value={cardTextColor}
+                onChange={(e) => setCardTextColor(e.target.value)}
+                placeholder="#ffffff"
+              />
+            </div>
           </div>
         </div>
 
+        {/* Colonne 2: uploads logo + fond */}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">Logo</label>
+            <div className="flex items-center gap-3">
+              <div className="h-14 w-24 flex items-center justify-center rounded border border-slate-200 bg-slate-50 overflow-hidden">
+                {logoPreview ? (
+                  <img
+                    src={logoPreview}
+                    alt="Logo"
+                    className="max-h-12 max-w-[88px] object-contain"
+                  />
+                ) : (
+                  <span className="text-[10px] text-slate-400">Aucun logo</span>
+                )}
+              </div>
+              <ImageUploadButton
+                universityId={props.universityId}
+                endpoint="logo"
+                label="Televerser un logo"
+                onUploaded={(url) => {
+                  setLogoPreview(url);
+                  props.onRefresh();
+                }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">
+              Visuel de fond de carte
+            </label>
+            <div className="flex items-center gap-3">
+              <div
+                className="rounded border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center"
+                style={{ width: 95, height: 60 }}
+              >
+                {bgPreview ? (
+                  <img
+                    src={bgPreview}
+                    alt="Fond de carte"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-[10px] text-slate-400 px-1 text-center">
+                    Aucun fond
+                  </span>
+                )}
+              </div>
+              <ImageUploadButton
+                universityId={props.universityId}
+                endpoint="card-bg"
+                label="Televerser un fond"
+                onUploaded={(url) => {
+                  setBgPreview(url);
+                  props.onRefresh();
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Colonne 3: apercu carte combine */}
         <div>
           <label className="block text-xs text-slate-600 mb-1">
-            URL du logo
+            Apercu de la carte
           </label>
-          <input
-            className="input"
-            type="url"
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="https://exemple.fr/logo.png"
-          />
+          <div
+            className="relative rounded-xl border border-slate-200 shadow-sm overflow-hidden"
+            style={{
+              aspectRatio: '1.585 / 1',
+              backgroundColor: brandColor,
+            }}
+          >
+            {bgPreview ? (
+              <img
+                src={bgPreview}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            ) : null}
+            {/* Voile pour la lisibilite du texte sur le fond. */}
+            <div className="absolute inset-0 bg-black/15" />
+            <div className="relative h-full w-full p-3 flex flex-col justify-between">
+              <div className="flex items-start justify-between gap-2">
+                {logoPreview ? (
+                  <img
+                    src={logoPreview}
+                    alt="Logo"
+                    className="max-h-7 max-w-[70px] object-contain drop-shadow"
+                  />
+                ) : (
+                  <span />
+                )}
+              </div>
+              <div style={{ color: cardTextColor }}>
+                <div className="text-[11px] font-semibold leading-tight drop-shadow">
+                  {props.universityName}
+                </div>
+                <div className="text-[9px] opacity-90 drop-shadow">
+                  Carte etudiante
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      {logoUrl ? (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Apercu:</span>
-          <img
-            src={logoUrl}
-            alt="Logo"
-            className="h-8 max-w-[160px] object-contain"
-          />
-        </div>
-      ) : null}
 
       {props.error ? (
         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
@@ -894,17 +1120,22 @@ function BrandingCard(props: {
         </div>
       ) : null}
       {props.saved && !props.error ? (
-        <div className="text-sm text-green-700">Identite visuelle enregistree.</div>
+        <div className="text-sm text-green-700">Design de la carte enregistre.</div>
       ) : null}
 
       <div className="flex justify-end">
         <button
-          disabled={props.submitting || !/^#[0-9a-fA-F]{6}$/.test(brandColor)}
+          disabled={
+            props.submitting ||
+            !/^#[0-9a-fA-F]{6}$/.test(brandColor) ||
+            !/^#[0-9a-fA-F]{6}$/.test(cardTextColor)
+          }
           onClick={() =>
             props.onSubmit({
               sector,
               brandColor,
-              logoUrl: logoUrl.trim() ? logoUrl.trim() : null,
+              cardTextColor,
+              logoUrl: logoPreview.trim() ? logoPreview.trim() : null,
             })
           }
           className="btn-primary"

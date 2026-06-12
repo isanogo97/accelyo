@@ -299,7 +299,7 @@
     return ({ SCHOOL: 'Etablissement scolaire', LIBRARY: 'Bibliotheque', COMPANY: 'Entreprise', ASSOCIATION: 'Association' })[s] || '';
   }
   function cardTitleFor(s) {
-    if (s === 'COMPANY') return 'Badge';
+    if (s === 'COMPANY') return 'Carte';
     if (s === 'ASSOCIATION') return 'Carte membre';
     return 'Carte etudiante';
   }
@@ -406,33 +406,96 @@
   // ====================================================================
   // ONGLET CARTE
   // ====================================================================
+  // Initiales prenom + nom pour l'avatar de repli (aucune ressource externe)
+  function initialsOf(st) {
+    var f = (st.firstName || '').trim();
+    var l = (st.lastName || '').trim();
+    var a = f ? f.charAt(0) : '';
+    var b = l ? l.charAt(0) : '';
+    var ini = (a + b).toUpperCase();
+    return ini || '—';
+  }
+
   function renderCarte(view) {
     var st = me.student || {}, est = me.establishment || {}, card = me.card || null;
     var sector = est.sector;
     header(view, cardTitleFor(sector), null);
 
-    var ic = el('div', 'idcard');
     var status = card ? card.status : null;
     var active = status === 'ACTIVE' || status === 'Active';
-    var statusTxt = !card ? '—' : (active ? 'Active' : (status === 'SUSPENDED' ? 'Suspendue' : status));
+    var suspended = status === 'SUSPENDED' || status === 'Suspended';
+    var statusTxt = !card ? '—' : (active ? 'Active' : (suspended ? 'Suspendue' : status));
+    var statusCls = !card ? 'none' : (active ? 'active' : (suspended ? 'suspended' : 'other'));
     var name = ((st.firstName || '') + ' ' + (st.lastName || '')).trim() || '—';
-    var exp = (card && card.expiresAt) ? 'Expire le ' + fmtDateLong(new Date(card.expiresAt)) : '';
+    var exp = (card && card.expiresAt) ? fmtDateLong(new Date(card.expiresAt)) : '';
     var roleTxt = ({ COMPANY: 'Collaborateur', ASSOCIATION: 'Membre' })[sector] || 'Etudiant';
+    var subline = roleTxt + (st.program ? ' · ' + st.program : '');
+
+    // Couleur de texte de la carte (defaut blanc) — pilote la lisibilite
+    var textColor = est.cardTextColor || '#ffffff';
+
+    var ic = el('div', 'idcard');
+    ic.style.setProperty('--card-ink', textColor);
+
+    // Fond : image de l'etablissement (meme origine) sinon degrade de marque
+    if (est.cardBackgroundUrl) {
+      ic.classList.add('has-bg');
+      ic.style.backgroundImage = 'url("' + String(est.cardBackgroundUrl).replace(/"/g, '%22') + '")';
+    }
+
+    // Logo etablissement (sinon logo Accelyo en filigrane blanc)
+    var hasEstLogo = !!est.logoUrl;
+    var logoSrc = hasEstLogo ? esc(est.logoUrl) : '/assets/logo.svg';
+
+    // Vignette photo etudiant (URL presignee same-origin) ou avatar a initiales
+    var photoHtml;
+    if (st.photoUrl) {
+      photoHtml = '<div class="ic-photo"><img alt="Photo de ' + esc(name) + '"/></div>';
+    } else {
+      photoHtml = '<div class="ic-photo ic-photo-fallback" aria-hidden="true">' + esc(initialsOf(st)) + '</div>';
+    }
 
     ic.innerHTML =
-      '<div class="ic-top">' +
-        '<div class="ic-estab">' + esc(est.name || 'Accelyo') + '</div>' +
-        '<div class="ic-logo"><img src="' + (est.logoUrl ? esc(est.logoUrl) : '/assets/logo.svg') + '" alt=""/></div>' +
-      '</div>' +
-      '<div class="ic-name">' + esc(name) + '</div>' +
-      '<div class="ic-role">' + esc(roleTxt) + (st.program ? ' · ' + esc(st.program) : '') + '</div>' +
-      '<div class="ic-num">' + esc(st.studentNumber || '') + '</div>' +
-      '<div class="ic-meta">' +
-        '<span class="badge' + (active ? '' : ' suspended') + '"><span class="dot"></span>' + esc(statusTxt) + '</span>' +
-        '<span class="ic-exp">' + esc(exp) + '</span>' +
+      '<div class="ic-overlay" aria-hidden="true"></div>' +
+      '<div class="ic-shine" aria-hidden="true"></div>' +
+      '<div class="ic-content">' +
+        '<div class="ic-top">' +
+          '<div class="ic-brand">' +
+            '<span class="ic-logo' + (hasEstLogo ? ' estab' : '') + '"><img src="' + logoSrc + '" alt=""/></span>' +
+            '<span class="ic-estab">' + esc(est.name || 'Accelyo') + '</span>' +
+          '</div>' +
+          '<div class="ic-type">' + esc(cardTitleFor(sector)) + '</div>' +
+        '</div>' +
+        '<div class="ic-body">' +
+          photoHtml +
+          '<div class="ic-ident">' +
+            '<div class="ic-chip" aria-hidden="true"><span></span></div>' +
+            '<div class="ic-name">' + esc(name) + '</div>' +
+            '<div class="ic-role">' + esc(subline) + '</div>' +
+            '<div class="ic-num">' + esc(st.studentNumber || '') + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ic-meta">' +
+          '<span class="badge ' + statusCls + '"><span class="dot"></span>' + esc(statusTxt) + '</span>' +
+          (exp ? '<span class="ic-exp"><small>Expire le</small>' + esc(exp) + '</span>' : '') +
+        '</div>' +
       '</div>';
-    // logo carte en blanc (filtre) sauf si logo etablissement
-    if (est.logoUrl) { var im = ic.querySelector('.ic-logo img'); if (im) im.style.filter = 'none'; }
+
+    // Charge la photo en JS (repli avatar si l'URL presignee echoue)
+    if (st.photoUrl) {
+      var img = ic.querySelector('.ic-photo img');
+      if (img) {
+        img.onerror = function () {
+          var box = ic.querySelector('.ic-photo');
+          if (box) {
+            box.classList.add('ic-photo-fallback');
+            box.setAttribute('aria-hidden', 'true');
+            box.innerHTML = esc(initialsOf(st));
+          }
+        };
+        img.src = st.photoUrl;
+      }
+    }
     view.appendChild(ic);
 
     // Boutons Wallet

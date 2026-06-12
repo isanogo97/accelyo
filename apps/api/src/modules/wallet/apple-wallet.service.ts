@@ -32,11 +32,14 @@ import { execFileSync } from 'child_process';
 import { existsSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { get as httpGet } from 'http';
+import { get as httpsGet } from 'https';
 import { decrypt } from '@accelyo/crypto';
 import { prisma } from '../../config/database';
 import { getEnv } from '../../config/env';
 import { NotFoundError, BadRequestError } from '../../utils/errors';
 import { createZip } from './pkpass-zip';
+import { logger } from '../../utils/logger';
 
 // Icone PNG 29x29 opaque (couleur Accelyo #2563eb), generee hors-ligne.
 // Sert d'icon.png / icon@2x.png / logo.png par defaut.
@@ -83,6 +86,55 @@ function hexToRgb(hex: string): string {
 
 function sha1hex(buf: Buffer): string {
   return createHash('sha1').update(buf).digest('hex');
+}
+
+/**
+ * Telecharge une image depuis une URL http(s) vers un Buffer.
+ * ----------------------------------------------------------------
+ * Usage: recuperer les images de BRANDING etablissement (logo, fond de
+ * carte) servies par NOTRE endpoint public same-origin pour les inclure
+ * dans le .pkpass (logo.png / strip.png).
+ *
+ * Defensif: timeout court, taille bornee, et resolution `null` (jamais
+ * de rejet) en cas d'echec -> le passe reste genere sans ces images.
+ */
+async function fetchImage(
+  url: string | null,
+  maxBytes = 3 * 1024 * 1024,
+): Promise<Buffer | null> {
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  return new Promise((resolve) => {
+    try {
+      const getter = url.toLowerCase().startsWith('https:') ? httpsGet : httpGet;
+      const req = getter(url, (res) => {
+        if (!res.statusCode || res.statusCode >= 400) {
+          res.resume();
+          resolve(null);
+          return;
+        }
+        const chunks: Buffer[] = [];
+        let total = 0;
+        res.on('data', (c: Buffer) => {
+          total += c.length;
+          if (total > maxBytes) {
+            req.destroy();
+            resolve(null);
+            return;
+          }
+          chunks.push(c);
+        });
+        res.on('end', () => resolve(Buffer.concat(chunks)));
+        res.on('error', () => resolve(null));
+      });
+      req.setTimeout(4000, () => {
+        req.destroy();
+        resolve(null);
+      });
+      req.on('error', () => resolve(null));
+    } catch {
+      resolve(null);
+    }
+  });
 }
 
 interface PassField {
@@ -173,6 +225,8 @@ export async function buildApplePkpass(studentId: string): Promise<Buffer> {
   );
   const universityName = card.student.university.name;
   const brandColor = card.student.university.brandColor;
+  const logoBrandingUrl = card.student.university.logoUrl;
+  const cardBgUrl = card.student.university.cardBackgroundUrl;
 
   const secondaryFields: PassField[] = [
     { key: 'student', label: 'N° etudiant', value: studentNumber },
@@ -188,7 +242,7 @@ export async function buildApplePkpass(studentId: string): Promise<Buffer> {
     });
   }
 
-  const pass = {
+  const pass: Record<string, unknown> = {
     formatVersion: 1,
     passTypeIdentifier: env.APPLE_WALLET_PASS_TYPE_ID,
     teamIdentifier: env.APPLE_WALLET_TEAM_ID,
@@ -214,15 +268,62 @@ export async function buildApplePkpass(studentId: string): Promise<Buffer> {
     ],
   };
 
+  // Badgeage NFC Apple (VAS/NFC): on n'ajoute le dict `nfc` que si le flag
+  // APPLE_WALLET_NFC_ENABLED est vrai ET qu'une cle publique ECDH P-256
+  // (base64) est presente. Defensif: aucune erreur si la cle est
+  // absente/vide -> le passe reste un passe visuel normal (storeCard + QR).
+  //
+  // IMPORTANT: ce dict n'est honore par iOS QUE si le passe est signe avec
+  // un certificat disposant de l'entitlement NFC Apple (Apple Wallet Access
+  // / NFC certificates), un programme ferme sur approbation Apple. Sans cet
+  // entitlement, iOS ignore simplement le dict (pas de badgeage NFC).
+  const nfcPublicKey =
+    typeof env.APPLE_WALLET_NFC_PUBLIC_KEY === 'string'
+      ? env.APPLE_WALLET_NFC_PUBLIC_KEY.trim()
+      : '';
+  if (env.APPLE_WALLET_NFC_ENABLED && nfcPublicKey) {
+    // `message` = cardUid (coherent avec le QR et le flux HCE existant).
+    pass.nfc = {
+      message: card.cardUid,
+      encryptionPublicKey: nfcPublicKey,
+    };
+  }
+
   const passJson = Buffer.from(JSON.stringify(pass), 'utf8');
+
+  // Habillage carte: on tente de recuperer les images de branding
+  // etablissement (servies par notre endpoint public same-origin) pour
+  // les inclure comme logo.png / strip.png. Defensif: si indisponible,
+  // on garde l'icone embarquee (le passe reste genere). PAS de photo
+  // etudiant ici (donnee perso).
+  let logoData: Buffer = DEFAULT_ICON_PNG;
+  let stripData: Buffer | null = null;
+  try {
+    const [logoImg, stripImg] = await Promise.all([
+      fetchImage(logoBrandingUrl),
+      fetchImage(cardBgUrl),
+    ]);
+    if (logoImg) logoData = logoImg;
+    if (stripImg) stripData = stripImg;
+  } catch (err) {
+    logger.warn(
+      { err, studentId },
+      'Recuperation des images de branding Apple Wallet echouee (fallback)',
+    );
+  }
 
   // Fichiers du passe (hors manifest/signature).
   const contentFiles: { name: string; data: Buffer }[] = [
     { name: 'pass.json', data: passJson },
     { name: 'icon.png', data: DEFAULT_ICON_PNG },
     { name: 'icon@2x.png', data: DEFAULT_ICON_PNG },
-    { name: 'logo.png', data: DEFAULT_ICON_PNG },
+    { name: 'logo.png', data: logoData },
   ];
+  // strip.png = visuel de fond de carte (bandeau superieur).
+  if (stripData) {
+    contentFiles.push({ name: 'strip.png', data: stripData });
+    contentFiles.push({ name: 'strip@2x.png', data: stripData });
+  }
 
   // manifest.json = { fichier: sha1hex }.
   const manifest: Record<string, string> = {};

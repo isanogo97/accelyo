@@ -16,6 +16,7 @@
  */
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import { randomBytes } from 'crypto';
 import { z } from 'zod';
 import { Role, AuditAction } from '@accelyo/shared';
@@ -27,15 +28,25 @@ import { emailSchema } from '@accelyo/validators';
 import { hashPassword } from '@accelyo/crypto';
 import { prisma } from '../../config/database';
 import { getEnv } from '../../config/env';
+import { uploadPhoto } from '../../services/storageService';
 import { sendEmail } from '../../services/emailService';
 import { requireAuth } from '../../middleware/auth';
-import { requireRole } from '../../middleware/rbac';
+import { requireRole, requireSameUniversity } from '../../middleware/rbac';
 import { writeAudit } from '../../middleware/audit';
 import { respondOk, respondCreated, respondNoContent } from '../../utils/respond';
-import { ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors';
 
 const router = Router();
 router.use(requireAuth);
+
+// Upload des images de branding (logo, fond de carte).
+// Memoire (pas de disque) + limite ~3 Mo. Type valide dans le handler.
+const BRANDING_MAX_BYTES = 3 * 1024 * 1024;
+const ALLOWED_BRANDING_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const uploadBranding = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: BRANDING_MAX_BYTES },
+});
 
 /**
  * Envoie le mot de passe provisoire a un admin par e-mail (best-effort).
@@ -435,6 +446,74 @@ router.delete(
       next(e);
     }
   },
+);
+
+// -----------------------------------------------------------------
+// Branding etablissement: upload logo + fond de carte (UNIVERSITY_ADMIN).
+// -----------------------------------------------------------------
+// Les images sont stockees dans MinIO sous une cle DETERMINISTE
+// (branding/<id>/logo | card-bg) puis exposees PUBLIQUEMENT (same-origin)
+// via /api/v1/public/establishments/:id/... (necessaire pour Google/Apple
+// Wallet). On enregistre l'URL PUBLIQUE ABSOLUE dans le champ University.
+//
+// kind: 'logo' (-> University.logoUrl) ou 'card-bg' (-> cardBackgroundUrl).
+async function handleBrandingUpload(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  kind: 'logo' | 'card-bg',
+): Promise<void> {
+  try {
+    const id = String(req.params.id);
+    const file = req.file;
+    if (!file) throw new BadRequestError('Fichier manquant (champ "file")');
+    if (!ALLOWED_BRANDING_TYPES.includes(file.mimetype)) {
+      throw new BadRequestError(
+        'Format non supporte (png, jpeg ou webp uniquement)',
+      );
+    }
+
+    const objectKey = `branding/${id}/${kind}`;
+    await uploadPhoto(objectKey, file.buffer, file.mimetype);
+
+    const env = getEnv();
+    const base = env.API_BASE_URL.replace(/\/$/, '');
+    const url = `${base}/api/v1/public/establishments/${id}/${kind}`;
+
+    await prisma.university.update({
+      where: { id },
+      data: kind === 'logo' ? { logoUrl: url } : { cardBackgroundUrl: url },
+    });
+
+    writeAudit(req, {
+      action: AuditAction.UNIVERSITY_UPDATED,
+      resourceType: 'University',
+      resourceId: id,
+      metadata: { branding: kind },
+    });
+
+    respondOk(res, { url });
+  } catch (e) {
+    next(e);
+  }
+}
+
+router.post(
+  '/:id/branding/logo',
+  requireRole(Role.UNIVERSITY_ADMIN, Role.SUPER_ADMIN),
+  requireSameUniversity('id'),
+  uploadBranding.single('file'),
+  (req: Request, res: Response, next: NextFunction) =>
+    handleBrandingUpload(req, res, next, 'logo'),
+);
+
+router.post(
+  '/:id/branding/card-bg',
+  requireRole(Role.UNIVERSITY_ADMIN, Role.SUPER_ADMIN),
+  requireSameUniversity('id'),
+  uploadBranding.single('file'),
+  (req: Request, res: Response, next: NextFunction) =>
+    handleBrandingUpload(req, res, next, 'card-bg'),
 );
 
 export default router;

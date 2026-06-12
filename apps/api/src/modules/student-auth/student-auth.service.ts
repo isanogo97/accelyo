@@ -19,6 +19,7 @@ import {
 import { prisma } from '../../config/database';
 import { getEnv } from '../../config/env';
 import { sendEmail } from '../../services/emailService';
+import { getPresignedUrl } from '../../services/storageService';
 import { issueCard } from '../cards/cards.service';
 import { logger } from '../../utils/logger';
 import {
@@ -160,6 +161,15 @@ export async function login(
   return { token: issueStudentToken(student.id) };
 }
 
+/**
+ * Cle MinIO deterministe de la photo d'identite d'un etudiant.
+ * La photo est une donnee perso: elle n'est servie QUE via une URL
+ * presignee courte ci-dessous, et JAMAIS publiquement / sur un passe.
+ */
+function studentPhotoKey(studentId: string): string {
+  return `photos/${studentId}`;
+}
+
 export async function getMe(studentId: string) {
   const env = getEnv();
   const student = await prisma.student.findUnique({
@@ -167,6 +177,18 @@ export async function getMe(studentId: string) {
     include: { university: true, card: true },
   });
   if (!student) throw new NotFoundError('Etudiant introuvable');
+
+  // Photo etudiant: URL presignee courte (~300s), UNIQUEMENT si une photo
+  // existe (photoHash present). Seule exposition de la photo, authentifiee.
+  let photoUrl: string | null = null;
+  if (student.photoHash) {
+    try {
+      photoUrl = await getPresignedUrl(studentPhotoKey(student.id), 300);
+    } catch {
+      // MinIO indisponible / objet absent -> on degrade en null.
+      photoUrl = null;
+    }
+  }
 
   return {
     student: {
@@ -177,6 +199,8 @@ export async function getMe(studentId: string) {
       email: decrypt(student.emailEnc, env.ENCRYPTION_KEY),
       enrollmentYear: student.enrollmentYear,
       program: student.program,
+      // URL presignee courte (donnee perso) ou null si pas de photo.
+      photoUrl,
     },
     card: student.card
       ? {
@@ -190,6 +214,8 @@ export async function getMe(studentId: string) {
       sector: student.university.sector,
       brandColor: student.university.brandColor,
       logoUrl: student.university.logoUrl,
+      cardBackgroundUrl: student.university.cardBackgroundUrl,
+      cardTextColor: student.university.cardTextColor,
     },
     marketingConsent: student.marketingConsent,
   };

@@ -8,8 +8,11 @@
  * La classe (genericClasses) est incluse inline: elle est creee a la
  * premiere sauvegarde si elle n'existe pas (mode demo).
  *
- * NFC Smart Tap: a activer plus tard (enableSmartTap + redemptionIssuers
- * + enrolement du collector ID des lecteurs Elatec aupres de Google).
+ * NFC Smart Tap: implemente ici, mais ACTIF UNIQUEMENT si
+ * GOOGLE_WALLET_SMART_TAP_ISSUER_ID est defini (le collector / redemption
+ * issuer ID fourni par Google apres enrolement au programme Smart Tap) ET
+ * que le lecteur (Elatec) est configure en mode Smart Tap/VAS. Sinon le
+ * passe reste un passe visuel normal. Voir WALLET_NFC_BADGING.md.
  */
 import { readFileSync } from 'fs';
 import jwt from 'jsonwebtoken';
@@ -47,6 +50,11 @@ export async function buildGoogleWalletSaveUrl(studentId: string): Promise<strin
   const env = getEnv();
   const key = loadServiceAccountKey();
   const issuerId = env.GOOGLE_WALLET_ISSUER_ID as string;
+  // Smart Tap (badgeage NFC): actif uniquement si l'emetteur est enrole
+  // Smart Tap chez Google ET que le lecteur (Elatec) est configure en mode
+  // Smart Tap/VAS. Tant que cet ID est absent -> passe visuel normal.
+  const smartTapIssuerId = env.GOOGLE_WALLET_SMART_TAP_ISSUER_ID;
+  const smartTapEnabled = Boolean(smartTapIssuerId);
 
   // Une carte par etudiant (Card.studentId est unique).
   const card = await prisma.card.findUnique({
@@ -62,12 +70,30 @@ export async function buildGoogleWalletSaveUrl(studentId: string): Promise<strin
     env.ENCRYPTION_KEY,
   );
   const universityName = card.student.university.name;
+  const university = card.student.university;
+  // Couleur de marque de l'etablissement (fallback bleu si invalide).
+  const brandColor =
+    typeof university.brandColor === 'string' &&
+    /^#[0-9a-fA-F]{6}$/.test(university.brandColor.trim())
+      ? university.brandColor.trim()
+      : '#1d4ed8';
+  // Google Wallet ne supporte PAS le SVG: on n'inclut le logo /
+  // heroImage que si c'est une URL http(s) raster. Notre endpoint
+  // public (.../logo, .../card-bg) sert bien des images uploadees raster.
+  const isRasterHttp = (u: string | null): u is string =>
+    typeof u === 'string' &&
+    /^https?:\/\//i.test(u) &&
+    !/\.svg(\?|$)/i.test(u);
+  const logoUri = isRasterHttp(university.logoUrl) ? university.logoUrl : null;
+  const heroUri = isRasterHttp(university.cardBackgroundUrl)
+    ? university.cardBackgroundUrl
+    : null;
 
   const classId = `${issuerId}.accelyo_student`;
   // Les ids d'objets doivent etre alphanumeriques (., _, -) cote Google.
   const objectId = `${issuerId}.${card.id.replace(/[^\w.-]/g, '_')}`;
 
-  const genericClass = {
+  const genericClass: Record<string, unknown> = {
     id: classId,
     classTemplateInfo: {
       cardTemplateOverride: {
@@ -88,10 +114,19 @@ export async function buildGoogleWalletSaveUrl(studentId: string): Promise<strin
     },
   };
 
-  const genericObject = {
+  // Smart Tap au niveau de la classe: active la lecture NFC du passe par
+  // un lecteur Smart Tap et declare le(s) collector(s)/redemption issuer(s)
+  // autorise(s). N'est ajoute que si l'emetteur est enrole Smart Tap.
+  if (smartTapEnabled) {
+    genericClass.enableSmartTap = true;
+    genericClass.redemptionIssuers = [smartTapIssuerId];
+  }
+
+  const genericObject: Record<string, unknown> = {
     id: objectId,
     classId,
     state: 'ACTIVE',
+    // Titre = nom de l'etablissement (la carte ressemble a SA carte).
     cardTitle: {
       defaultValue: { language: 'fr', value: universityName },
     },
@@ -101,13 +136,8 @@ export async function buildGoogleWalletSaveUrl(studentId: string): Promise<strin
     header: {
       defaultValue: { language: 'fr', value: `${firstName} ${lastName}` },
     },
-    hexBackgroundColor: '#1d4ed8',
-    logo: {
-      sourceUri: { uri: 'https://accelyo.fr/assets/logo.svg' },
-      contentDescription: {
-        defaultValue: { language: 'fr', value: 'Accelyo' },
-      },
-    },
+    // Couleur de l'etablissement (et non plus un bleu code en dur).
+    hexBackgroundColor: brandColor,
     textModulesData: [
       {
         id: 'student_number',
@@ -116,12 +146,40 @@ export async function buildGoogleWalletSaveUrl(studentId: string): Promise<strin
       },
       { id: 'status', header: 'Statut', body: 'Etudiant' },
     ],
+    // QR conserve (cardUid). PAS de photo etudiant (donnee perso).
     barcode: {
       type: 'QR_CODE',
       value: card.cardUid,
       alternateText: studentNumber,
     },
   };
+
+  // Logo de l'etablissement (uniquement si raster http(s) - pas de SVG).
+  if (logoUri) {
+    genericObject.logo = {
+      sourceUri: { uri: logoUri },
+      contentDescription: {
+        defaultValue: { language: 'fr', value: universityName },
+      },
+    };
+  }
+  // Visuel de fond de carte en heroImage si disponible.
+  if (heroUri) {
+    genericObject.heroImage = {
+      sourceUri: { uri: heroUri },
+      contentDescription: {
+        defaultValue: { language: 'fr', value: 'Carte etudiante' },
+      },
+    };
+  }
+
+  // Valeur transmise via NFC Smart Tap au lecteur: on reutilise le cardUid
+  // (coherent avec le QR / le flux HCE existant). Le backend la validera
+  // exactement comme la valeur lue via QR ou HCE. N'est ajoute que si Smart
+  // Tap est actif (sinon passe visuel normal, zero regression).
+  if (smartTapEnabled) {
+    genericObject.smartTapRedemptionValue = card.cardUid;
+  }
 
   const claims = {
     iss: key.client_email,

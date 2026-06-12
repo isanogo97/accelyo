@@ -33,6 +33,7 @@ import contactRoutes from './modules/contact/contact.routes';
 import walletRoutes from './modules/wallet/wallet.routes';
 import studentAuthRoutes from './modules/student-auth/student-auth.routes';
 import studentPortalRoutes from './modules/student-portal/student-portal.routes';
+import publicRoutes from './modules/public/public.routes';
 
 export function buildApp(): Express {
   const app = express();
@@ -66,6 +67,11 @@ export function buildApp(): Express {
 
   // Rate limiter general - applique a tout /api/.
   app.use('/api', limiterApiGeneral);
+
+  // Diffusion PUBLIQUE (SANS auth) des images de branding etablissement.
+  // Public PAR CONCEPTION (branding non sensible) - voir public.routes.ts.
+  // Place AVANT les routes authentifiees.
+  app.use('/api/v1/public', publicRoutes);
 
   // Routes par module.
   app.use('/api/v1/auth', authRoutes);
