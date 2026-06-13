@@ -50,6 +50,18 @@ export enum DeploymentMode {
   ON_PREMISE = 'ON_PREMISE',
 }
 
+/**
+ * Mode d'authentification des etudiants pour un etablissement (tenant).
+ * ATTENTION: Doit rester aligne avec l'enum Prisma `AuthMode`
+ * (apps/api/prisma/schema.prisma).
+ */
+export enum AuthMode {
+  /** Mot de passe gere par Accelyo (activation + reset par e-mail). */
+  ACCELYO_PASSWORD = 'ACCELYO_PASSWORD',
+  /** Authentification deleguee a l'ENT de l'universite (futur). */
+  SSO_ENT = 'SSO_ENT',
+}
+
 /** Plateformes supportees pour les appareils etudiants. */
 export enum Platform {
   ANDROID = 'ANDROID',

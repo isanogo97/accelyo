@@ -200,7 +200,16 @@ export async function getMyWalletApple(
   }
 }
 
-/** Admin: (re)generer et renvoyer le lien d'activation d'un etudiant. */
+/**
+ * Admin: (re)generer et renvoyer le lien d'activation/reinitialisation d'un
+ * etudiant. Reutilise comme "reinitialiser le mot de passe": l'etudiant
+ * (meme deja active) recoit un e-mail avec un lien /carte?token=... lui
+ * permettant de (re)definir son mot de passe.
+ *
+ * Garde: en mode SSO_ENT, le compte est gere par l'ENT de l'universite ->
+ * la reinitialisation Accelyo est refusee (400). Seul le mode
+ * ACCELYO_PASSWORD autorise ce flux.
+ */
 export async function postResend(
   req: Request,
   res: Response,
@@ -210,11 +219,17 @@ export async function postResend(
     const env = getEnv();
     const student = await prisma.student.findUnique({
       where: { id: req.params.studentId },
+      include: { university: { select: { authMode: true } } },
     });
     if (!student) throw new NotFoundError('Etudiant introuvable');
+    if (student.university.authMode === 'SSO_ENT') {
+      throw new BadRequestError(
+        "Compte gere par l'ENT : reinitialisation via l'ENT",
+      );
+    }
     const email = decrypt(student.emailEnc, env.ENCRYPTION_KEY);
     await issueActivation(student.id, email);
-    respondOk(res, { sent: true });
+    respondOk(res, { emailed: true });
   } catch (e) {
     next(e);
   }

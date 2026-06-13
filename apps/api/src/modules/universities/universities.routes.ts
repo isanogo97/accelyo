@@ -194,21 +194,51 @@ router.get('/:id/stats', async (req, res, next) => {
   }
 });
 
+/**
+ * Champs qu'un UNIVERSITY_ADMIN peut modifier sur SON etablissement.
+ * (branding + mode d'authentification etudiant). Les champs structurants
+ * - domaine, secteur, mode de deploiement, coordonnees - restent reserves
+ * au SUPER_ADMIN.
+ */
+const UNIVERSITY_ADMIN_EDITABLE_FIELDS = [
+  'authMode',
+  'brandColor',
+  'logoUrl',
+] as const;
+
 router.put(
   '/:id',
-  requireRole(Role.SUPER_ADMIN),
+  requireRole(Role.SUPER_ADMIN, Role.UNIVERSITY_ADMIN),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = String(req.params.id);
-      const body = updateUniversitySchema.parse(req.body);
+      const isSuperAdmin = req.auth!.role === Role.SUPER_ADMIN;
+
+      // Un UNIVERSITY_ADMIN ne peut editer QUE son propre etablissement,
+      // et UNIQUEMENT un sous-ensemble de champs (branding + authMode).
+      if (!isSuperAdmin && req.auth!.universityId !== id) {
+        throw new ForbiddenError('Universite hors perimetre');
+      }
+
+      const parsed = updateUniversitySchema.parse(req.body);
+      let data: typeof parsed = parsed;
+      if (!isSuperAdmin) {
+        const allowed: Record<string, unknown> = {};
+        for (const key of UNIVERSITY_ADMIN_EDITABLE_FIELDS) {
+          if (parsed[key] !== undefined) allowed[key] = parsed[key];
+        }
+        data = allowed as typeof parsed;
+      }
+
       const updated = await prisma.university.update({
         where: { id },
-        data: body,
+        data,
       });
       writeAudit(req, {
         action: AuditAction.UNIVERSITY_UPDATED,
         resourceType: 'University',
         resourceId: id,
+        metadata: data.authMode ? { authMode: data.authMode } : undefined,
       });
       respondOk(res, updated);
     } catch (e) {

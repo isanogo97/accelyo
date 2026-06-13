@@ -42,6 +42,8 @@ export const createUniversitySchema = z.object({
   address: z.string().max(200).optional(),
   city: z.string().max(120).optional(),
   postalCode: z.string().regex(/^\d{5}$/, 'Code postal a 5 chiffres').optional(),
+  /** Mode d'authentification etudiant: mot de passe Accelyo ou SSO ENT (futur). */
+  authMode: z.enum(['ACCELYO_PASSWORD', 'SSO_ENT']).optional(),
 });
 export type CreateUniversityInput = z.infer<typeof createUniversitySchema>;
 

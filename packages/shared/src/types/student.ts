@@ -28,6 +28,13 @@ export interface Student {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Mode d'authentification de l'etablissement de l'etudiant
+   * (vue admin). Permet au dashboard d'afficher/masquer le bouton
+   * de reinitialisation du mot de passe. Optionnel: absent des
+   * vues qui ne joignent pas l'universite.
+   */
+  establishmentAuthMode?: 'ACCELYO_PASSWORD' | 'SSO_ENT';
 }
 
 /**

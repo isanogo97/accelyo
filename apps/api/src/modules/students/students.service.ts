@@ -122,9 +122,16 @@ export async function findStudents(opts: {
 }
 
 export async function findStudentById(id: string): Promise<Student> {
-  const row = await prisma.student.findUnique({ where: { id } });
+  const row = await prisma.student.findUnique({
+    where: { id },
+    include: { university: { select: { authMode: true } } },
+  });
   if (!row) throw new NotFoundError('Etudiant introuvable');
-  return withPhotoUrl(row);
+  const dto = await withPhotoUrl(row);
+  // Vue admin: on expose le mode d'auth de l'etablissement pour que le
+  // dashboard sache afficher/masquer la reinitialisation du mot de passe.
+  dto.establishmentAuthMode = row.university.authMode;
+  return dto;
 }
 
 /**

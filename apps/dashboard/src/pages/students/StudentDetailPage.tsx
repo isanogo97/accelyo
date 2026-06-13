@@ -16,6 +16,9 @@ type Student = {
   program: string | null;
   photoUrl?: string | null;
   photoHash?: string | null;
+  // Mode d'authentification de l'etablissement de l'etudiant.
+  // En SSO_ENT, les mots de passe sont geres par l'ENT (pas de reset Accelyo).
+  establishmentAuthMode?: 'ACCELYO_PASSWORD' | 'SSO_ENT';
 };
 
 export function StudentDetailPage() {
@@ -88,6 +91,12 @@ export function StudentDetailPage() {
         }
       />
 
+      {/* Securite / compte: reinitialisation du mot de passe etudiant */}
+      <StudentSecurityCard
+        studentId={id!}
+        authMode={data.establishmentAuthMode ?? 'ACCELYO_PASSWORD'}
+      />
+
       <div className="card p-6 mt-4 space-y-3">
         <h2 className="text-lg font-medium">Carte dans le Wallet</h2>
         <p className="text-sm text-slate-600">
@@ -106,6 +115,92 @@ export function StudentDetailPage() {
           <div className="text-red-600 text-sm">{walletError}</div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Section "Securite / compte" de la fiche etudiant.
+ * - Mode ACCELYO_PASSWORD: bouton "Reinitialiser le mot de passe" qui envoie
+ *   un e-mail de reinitialisation a l'etudiant (POST /student-auth/resend/:id).
+ *   Confirmation via window.confirm, etats chargement/succes/erreur.
+ * - Mode SSO_ENT: pas d'action possible, mention desactivee
+ *   "Authentification geree par l'ENT".
+ */
+function StudentSecurityCard(props: {
+  studentId: string;
+  authMode: 'ACCELYO_PASSWORD' | 'SSO_ENT';
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const isEnt = props.authMode === 'SSO_ENT';
+
+  const resetPassword = async () => {
+    setError(null);
+    setSuccess(false);
+    const ok = window.confirm(
+      'Envoyer un e-mail de reinitialisation a l\'etudiant ?',
+    );
+    if (!ok) return;
+    setLoading(true);
+    try {
+      await api.post(`/student-auth/resend/${props.studentId}`);
+      setSuccess(true);
+    } catch (e) {
+      const msg = (e as {
+        response?: { data?: { error?: { message?: string } } };
+      }).response?.data?.error?.message;
+      setError(msg ?? 'Echec de l\'envoi. Reessayez.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="card p-6 mt-4 space-y-3">
+      <h2 className="text-lg font-medium">Securite du compte</h2>
+      <p className="text-sm text-slate-600">
+        Envoyez un e-mail a l'etudiant pour qu'il reinitialise son mot de passe.
+      </p>
+      {isEnt ? (
+        <div>
+          <button
+            type="button"
+            disabled
+            className="btn-primary disabled:opacity-50 cursor-not-allowed"
+            title="Authentification geree par l'ENT"
+          >
+            Authentification geree par l'ENT
+          </button>
+          <p className="text-xs text-slate-400 mt-1">
+            Cet etablissement utilise l'ENT/SSO de l'universite. La
+            reinitialisation du mot de passe se fait via l'ENT.
+          </p>
+        </div>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={resetPassword}
+            disabled={loading}
+            className="btn-primary disabled:opacity-50"
+          >
+            {loading
+              ? 'Envoi en cours...'
+              : 'Reinitialiser le mot de passe'}
+          </button>
+          {error ? (
+            <div className="text-sm text-red-600">{error}</div>
+          ) : null}
+          {success && !error ? (
+            <div className="text-sm text-green-700">
+              E-mail de reinitialisation envoye.
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

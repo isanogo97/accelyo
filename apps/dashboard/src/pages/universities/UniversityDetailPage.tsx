@@ -50,6 +50,8 @@ type University = {
   logoUrl: string | null;
   cardBackgroundUrl: string | null;
   cardTextColor: string | null;
+  // Mode d'authentification des etudiants de l'etablissement.
+  authMode?: 'ACCELYO_PASSWORD' | 'SSO_ENT';
   _count?: { students: number; admins: number; readers: number };
   contacts?: Contact[];
 };
@@ -174,11 +176,13 @@ export function UniversityDetailPage() {
       brandColor: string;
       logoUrl: string | null;
       cardTextColor: string;
+      authMode: 'ACCELYO_PASSWORD' | 'SSO_ENT';
     }) => {
       const r = await api.put(`/universities/${id}`, {
         sector: input.sector,
         brandColor: input.brandColor,
         cardTextColor: input.cardTextColor,
+        authMode: input.authMode,
         // logoUrl optionnel: on n'envoie le champ que s'il est renseigne.
         ...(input.logoUrl ? { logoUrl: input.logoUrl } : {}),
       });
@@ -253,6 +257,7 @@ export function UniversityDetailPage() {
       <BrandingCard
         universityId={id!}
         sector={univ.data.sector ?? 'SCHOOL'}
+        authMode={univ.data.authMode ?? 'ACCELYO_PASSWORD'}
         brandColor={univ.data.brandColor ?? '#2563eb'}
         logoUrl={univ.data.logoUrl ?? null}
         cardBackgroundUrl={univ.data.cardBackgroundUrl ?? null}
@@ -906,6 +911,7 @@ function ImageUploadButton(props: {
 function BrandingCard(props: {
   universityId: string;
   sector: string;
+  authMode: 'ACCELYO_PASSWORD' | 'SSO_ENT';
   brandColor: string;
   logoUrl: string | null;
   cardBackgroundUrl: string | null;
@@ -917,12 +923,16 @@ function BrandingCard(props: {
     brandColor: string;
     logoUrl: string | null;
     cardTextColor: string;
+    authMode: 'ACCELYO_PASSWORD' | 'SSO_ENT';
   }) => void;
   submitting: boolean;
   saved: boolean;
   error: string | null;
 }) {
   const [sector, setSector] = useState(props.sector);
+  const [authMode, setAuthMode] = useState<'ACCELYO_PASSWORD' | 'SSO_ENT'>(
+    props.authMode,
+  );
   const [brandColor, setBrandColor] = useState(props.brandColor);
   const [cardTextColor, setCardTextColor] = useState(props.cardTextColor);
 
@@ -958,6 +968,30 @@ function BrandingCard(props: {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-xs text-slate-600 mb-1">
+              Mode d'authentification
+            </label>
+            <select
+              className="input"
+              value={authMode}
+              onChange={(e) =>
+                setAuthMode(
+                  e.target.value as 'ACCELYO_PASSWORD' | 'SSO_ENT',
+                )
+              }
+            >
+              <option value="ACCELYO_PASSWORD">
+                Compte Accelyo (mot de passe gere par Accelyo)
+              </option>
+              <option value="SSO_ENT">ENT / SSO (universite)</option>
+            </select>
+            <p className="text-xs text-slate-400 mt-1">
+              En mode ENT, les mots de passe sont geres par l'universite ; la
+              reinitialisation se fait via l'ENT.
+            </p>
           </div>
 
           <div>
@@ -1135,6 +1169,7 @@ function BrandingCard(props: {
               sector,
               brandColor,
               cardTextColor,
+              authMode,
               logoUrl: logoPreview.trim() ? logoPreview.trim() : null,
             })
           }

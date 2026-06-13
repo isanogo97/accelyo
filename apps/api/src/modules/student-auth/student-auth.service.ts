@@ -221,6 +221,8 @@ export async function getMe(studentId: string) {
       logoUrl: student.university.logoUrl,
       cardBackgroundUrl: student.university.cardBackgroundUrl,
       cardTextColor: student.university.cardTextColor,
+      // Mode d'authentification de l'etablissement (utile a l'app).
+      authMode: student.university.authMode,
     },
     marketingConsent: student.marketingConsent,
   };

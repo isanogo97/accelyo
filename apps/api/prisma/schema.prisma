@@ -39,6 +39,8 @@ model University {
   domain         String         @unique
   siret          String?
   deploymentMode DeploymentMode @default(CLOUD)
+  // Mode d'authentification etudiant: mot de passe gere par Accelyo, ou SSO ENT (futur).
+  authMode       AuthMode       @default(ACCELYO_PASSWORD)
   sector         Sector         @default(SCHOOL)
   brandColor     String         @default("#2563eb")
   logoUrl        String?
@@ -370,6 +372,14 @@ enum CardStatus {
 enum DeploymentMode {
   CLOUD
   ON_PREMISE
+}
+
+// Mode d'authentification des etudiants pour un etablissement.
+// ACCELYO_PASSWORD: mot de passe gere par Accelyo (activation/reset par e-mail).
+// SSO_ENT: authentification deleguee a l'ENT de l'universite (futur).
+enum AuthMode {
+  ACCELYO_PASSWORD
+  SSO_ENT
 }
 
 enum Platform {
