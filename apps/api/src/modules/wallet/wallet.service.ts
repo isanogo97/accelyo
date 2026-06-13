@@ -5,14 +5,15 @@
  * service Google. Le lien https://pay.google.com/gp/v/save/<jwt>
  * ajoute la carte dans Google Wallet en un clic.
  *
- * La classe (genericClasses) est incluse inline: elle est creee a la
- * premiere sauvegarde si elle n'existe pas (mode demo).
+ * IMPORTANT - rafraichissement de l'apparence: Google ne met PAS a jour
+ * l'apparence d'un objet deja existant via le JWT "save". On PATCH donc
+ * l'objet (best-effort) a chaque construction du lien, pour que la couleur
+ * de marque / le logo / le visuel de l'etablissement soient toujours a jour
+ * sur le passe (sinon il reste fige sur sa premiere version, bleu par defaut).
  *
- * NFC Smart Tap: implemente ici, mais ACTIF UNIQUEMENT si
- * GOOGLE_WALLET_SMART_TAP_ISSUER_ID est defini (le collector / redemption
- * issuer ID fourni par Google apres enrolement au programme Smart Tap) ET
- * que le lecteur (Elatec) est configure en mode Smart Tap/VAS. Sinon le
- * passe reste un passe visuel normal. Voir WALLET_NFC_BADGING.md.
+ * NFC Smart Tap: ACTIF UNIQUEMENT si GOOGLE_WALLET_SMART_TAP_ISSUER_ID est
+ * defini ET que le lecteur (Elatec) est configure en mode Smart Tap/VAS.
+ * Voir WALLET_NFC_BADGING.md.
  */
 import { readFileSync } from 'fs';
 import jwt from 'jsonwebtoken';
@@ -46,17 +47,83 @@ function loadServiceAccountKey(): ServiceAccountKey {
   return cachedKey;
 }
 
+/** Access token OAuth2 (JWT bearer RS256) pour l'API Wallet Objects. */
+async function getWalletAccessToken(key: ServiceAccountKey): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const assertion = jwt.sign(
+    {
+      iss: key.client_email,
+      scope: 'https://www.googleapis.com/auth/wallet_object.issuer',
+      aud: 'https://oauth2.googleapis.com/token',
+      iat: now,
+      exp: now + 3600,
+    },
+    key.private_key,
+    { algorithm: 'RS256' },
+  );
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion,
+    }).toString(),
+  });
+  if (!tokenRes.ok) {
+    const text = await tokenRes.text();
+    throw new Error(`OAuth token HTTP ${tokenRes.status}: ${text}`);
+  }
+  const tokenJson = (await tokenRes.json()) as { access_token?: string };
+  if (!tokenJson.access_token) {
+    throw new Error('access_token absent de la reponse OAuth');
+  }
+  return tokenJson.access_token;
+}
+
+/**
+ * Met a jour (best-effort) l'apparence d'un objet Google Wallet existant.
+ * PATCH partiel SANS `state` (pour ne pas reactiver un passe suspendu/revoque).
+ * 404 = objet pas encore cree -> ignore (le JWT "save" le creera).
+ */
+async function patchWalletObjectAppearance(
+  objectId: string,
+  appearance: Record<string, unknown>,
+): Promise<void> {
+  const env = getEnv();
+  if (!env.GOOGLE_WALLET_ISSUER_ID || !env.GOOGLE_WALLET_KEY_PATH) return;
+  try {
+    const key = loadServiceAccountKey();
+    const accessToken = await getWalletAccessToken(key);
+    const res = await fetch(
+      `https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${objectId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appearance),
+      },
+    );
+    if (!res.ok && res.status !== 404) {
+      const text = await res.text();
+      throw new Error(`PATCH apparence HTTP ${res.status}: ${text}`);
+    }
+  } catch (err) {
+    logger.warn(
+      { err, objectId },
+      'Echec rafraichissement apparence passe Google Wallet (best-effort)',
+    );
+  }
+}
+
 export async function buildGoogleWalletSaveUrl(studentId: string): Promise<string> {
   const env = getEnv();
   const key = loadServiceAccountKey();
   const issuerId = env.GOOGLE_WALLET_ISSUER_ID as string;
-  // Smart Tap (badgeage NFC): actif uniquement si l'emetteur est enrole
-  // Smart Tap chez Google ET que le lecteur (Elatec) est configure en mode
-  // Smart Tap/VAS. Tant que cet ID est absent -> passe visuel normal.
   const smartTapIssuerId = env.GOOGLE_WALLET_SMART_TAP_ISSUER_ID;
   const smartTapEnabled = Boolean(smartTapIssuerId);
 
-  // Une carte par etudiant (Card.studentId est unique).
   const card = await prisma.card.findUnique({
     where: { studentId },
     include: { student: { include: { university: true } } },
@@ -65,21 +132,16 @@ export async function buildGoogleWalletSaveUrl(studentId: string): Promise<strin
 
   const firstName = decrypt(card.student.firstNameEnc, env.ENCRYPTION_KEY);
   const lastName = decrypt(card.student.lastNameEnc, env.ENCRYPTION_KEY);
-  const studentNumber = decrypt(
-    card.student.studentNumberEnc,
-    env.ENCRYPTION_KEY,
-  );
+  const studentNumber = decrypt(card.student.studentNumberEnc, env.ENCRYPTION_KEY);
   const universityName = card.student.university.name;
   const university = card.student.university;
-  // Couleur de marque de l'etablissement (fallback bleu si invalide).
+
   const brandColor =
     typeof university.brandColor === 'string' &&
     /^#[0-9a-fA-F]{6}$/.test(university.brandColor.trim())
       ? university.brandColor.trim()
       : '#1d4ed8';
-  // Google Wallet ne supporte PAS le SVG: on n'inclut le logo /
-  // heroImage que si c'est une URL http(s) raster. Notre endpoint
-  // public (.../logo, .../card-bg) sert bien des images uploadees raster.
+
   const isRasterHttp = (u: string | null): u is string =>
     typeof u === 'string' &&
     /^https?:\/\//i.test(u) &&
@@ -90,7 +152,6 @@ export async function buildGoogleWalletSaveUrl(studentId: string): Promise<strin
     : null;
 
   const classId = `${issuerId}.accelyo_student`;
-  // Les ids d'objets doivent etre alphanumeriques (., _, -) cote Google.
   const objectId = `${issuerId}.${card.id.replace(/[^\w.-]/g, '_')}`;
 
   const genericClass: Record<string, unknown> = {
@@ -113,59 +174,39 @@ export async function buildGoogleWalletSaveUrl(studentId: string): Promise<strin
       },
     },
   };
-
-  // Smart Tap au niveau de la classe: active la lecture NFC du passe par
-  // un lecteur Smart Tap et declare le(s) collector(s)/redemption issuer(s)
-  // autorise(s). N'est ajoute que si l'emetteur est enrole Smart Tap.
   if (smartTapEnabled) {
     genericClass.enableSmartTap = true;
     genericClass.redemptionIssuers = [smartTapIssuerId];
   }
 
-  const genericObject: Record<string, unknown> = {
-    id: objectId,
-    classId,
-    state: 'ACTIVE',
-    // Titre = nom de l'etablissement (la carte ressemble a SA carte).
-    cardTitle: {
-      defaultValue: { language: 'fr', value: universityName },
-    },
-    subheader: {
-      defaultValue: { language: 'fr', value: 'Carte etudiante' },
-    },
+  // Apparence (partagee entre le JWT "save" et le PATCH de refresh).
+  const appearance: Record<string, unknown> = {
+    cardTitle: { defaultValue: { language: 'fr', value: universityName } },
+    subheader: { defaultValue: { language: 'fr', value: 'Carte etudiante' } },
     header: {
       defaultValue: { language: 'fr', value: `${firstName} ${lastName}` },
     },
-    // Couleur de l'etablissement (et non plus un bleu code en dur).
     hexBackgroundColor: brandColor,
     textModulesData: [
-      {
-        id: 'student_number',
-        header: 'Numero etudiant',
-        body: studentNumber,
-      },
+      { id: 'student_number', header: 'Numero etudiant', body: studentNumber },
       { id: 'status', header: 'Statut', body: 'Etudiant' },
     ],
-    // QR conserve (cardUid). PAS de photo etudiant (donnee perso).
     barcode: {
       type: 'QR_CODE',
       value: card.cardUid,
       alternateText: studentNumber,
     },
   };
-
-  // Logo de l'etablissement (uniquement si raster http(s) - pas de SVG).
   if (logoUri) {
-    genericObject.logo = {
+    appearance.logo = {
       sourceUri: { uri: logoUri },
       contentDescription: {
         defaultValue: { language: 'fr', value: universityName },
       },
     };
   }
-  // Visuel de fond de carte en heroImage si disponible.
   if (heroUri) {
-    genericObject.heroImage = {
+    appearance.heroImage = {
       sourceUri: { uri: heroUri },
       contentDescription: {
         defaultValue: { language: 'fr', value: 'Carte etudiante' },
@@ -173,13 +214,20 @@ export async function buildGoogleWalletSaveUrl(studentId: string): Promise<strin
     };
   }
 
-  // Valeur transmise via NFC Smart Tap au lecteur: on reutilise le cardUid
-  // (coherent avec le QR / le flux HCE existant). Le backend la validera
-  // exactement comme la valeur lue via QR ou HCE. N'est ajoute que si Smart
-  // Tap est actif (sinon passe visuel normal, zero regression).
+  const genericObject: Record<string, unknown> = {
+    id: objectId,
+    classId,
+    state: 'ACTIVE',
+    ...appearance,
+  };
   if (smartTapEnabled) {
     genericObject.smartTapRedemptionValue = card.cardUid;
+    appearance.smartTapRedemptionValue = card.cardUid;
   }
+
+  // Rafraichit l'apparence du passe s'il existe deja (Google ne le fait pas
+  // via le JWT "save"). Best-effort: ne bloque jamais la generation du lien.
+  await patchWalletObjectAppearance(objectId, appearance);
 
   const claims = {
     iss: key.client_email,
@@ -198,65 +246,23 @@ export async function buildGoogleWalletSaveUrl(studentId: string): Promise<strin
 
 /**
  * Met a jour l'etat du passe Google Wallet (revocation/suspension/reactivation).
- * ----------------------------------------------------------------
- * Best-effort: si Google Wallet n'est pas configure, ou si l'appel echoue,
- * on logge un warning et on ne leve JAMAIS d'erreur (l'operation metier
- * sur la carte ne doit pas etre bloquee par Google).
- *
- * state:
- *   - ACTIVE   : passe visible/utilisable (reactivation)
+ * Best-effort: ne leve JAMAIS d'erreur (l'operation metier ne doit pas etre
+ * bloquee par Google).
+ *   - ACTIVE   : passe utilisable (reactivation)
  *   - INACTIVE : passe grise (suspension)
- *   - EXPIRED  : passe expire (revocation definitive)
+ *   - EXPIRED  : passe expire (revocation)
  */
 export async function updateGoogleWalletPassState(
   cardId: string,
   state: 'ACTIVE' | 'INACTIVE' | 'EXPIRED',
 ): Promise<void> {
   const env = getEnv();
-  // Pas configure -> best-effort: on ne fait rien.
-  if (!env.GOOGLE_WALLET_ISSUER_ID || !env.GOOGLE_WALLET_KEY_PATH) {
-    return;
-  }
-
+  if (!env.GOOGLE_WALLET_ISSUER_ID || !env.GOOGLE_WALLET_KEY_PATH) return;
   try {
     const key = loadServiceAccountKey();
     const issuerId = env.GOOGLE_WALLET_ISSUER_ID as string;
-    // Meme convention que buildGoogleWalletSaveUrl.
     const objectId = `${issuerId}.${cardId.replace(/[^\w.-]/g, '_')}`;
-
-    // a) Obtenir un access token OAuth2 via un JWT bearer (RS256).
-    const now = Math.floor(Date.now() / 1000);
-    const assertion = jwt.sign(
-      {
-        iss: key.client_email,
-        scope: 'https://www.googleapis.com/auth/wallet_object.issuer',
-        aud: 'https://oauth2.googleapis.com/token',
-        iat: now,
-        exp: now + 3600,
-      },
-      key.private_key,
-      { algorithm: 'RS256' },
-    );
-
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion,
-      }).toString(),
-    });
-    if (!tokenRes.ok) {
-      const text = await tokenRes.text();
-      throw new Error(`OAuth token HTTP ${tokenRes.status}: ${text}`);
-    }
-    const tokenJson = (await tokenRes.json()) as { access_token?: string };
-    const accessToken = tokenJson.access_token;
-    if (!accessToken) {
-      throw new Error('access_token absent de la reponse OAuth');
-    }
-
-    // b) PATCH de l'objet pour mettre a jour son etat.
+    const accessToken = await getWalletAccessToken(key);
     const patchRes = await fetch(
       `https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${objectId}`,
       {
@@ -273,7 +279,6 @@ export async function updateGoogleWalletPassState(
       throw new Error(`PATCH genericObject HTTP ${patchRes.status}: ${text}`);
     }
   } catch (err) {
-    // Best-effort: on logge mais on ne propage jamais.
     logger.warn(
       { err, cardId, state },
       'Echec mise a jour etat passe Google Wallet (best-effort)',
