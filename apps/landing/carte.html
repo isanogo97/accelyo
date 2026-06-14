@@ -60,7 +60,7 @@
             <label for="pw">Mot de passe</label>
             <input id="pw" type="password" autocomplete="new-password" required/>
           </div>
-          <p class="hint-pw">Au moins 12 caracteres.</p>
+          <p class="hint-pw">Au moins 12 caracteres, avec une majuscule, une minuscule, un chiffre et un caractere special.</p>
           <div class="field">
             <label for="pw2">Confirmer le mot de passe</label>
             <input id="pw2" type="password" autocomplete="new-password" required/>
@@ -220,7 +220,8 @@
         e.preventDefault();
         clrErr('aErr');
         var pw = $('pw').value, pw2 = $('pw2').value;
-        if (pw.length < 12) { setErr('aErr', 'Minimum 12 caracteres.'); return; }
+        var pwOk = pw.length >= 12 && /[a-z]/.test(pw) && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
+        if (!pwOk) { setErr('aErr', 'Le mot de passe doit faire au moins 12 caracteres et contenir une majuscule, une minuscule, un chiffre et un caractere special.'); return; }
         if (pw !== pw2) { setErr('aErr', 'Les mots de passe ne correspondent pas.'); return; }
         var b = $('aBtn'); b.disabled = true; b.textContent = 'Activation...';
         apiJson('/student-auth/activate', 'POST', { token: actToken, password: pw })
