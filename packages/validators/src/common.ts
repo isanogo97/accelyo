@@ -36,3 +36,12 @@ export const passwordSchema = z
   .regex(/[A-Z]/, 'Au moins une majuscule')
   .regex(/[0-9]/, 'Au moins un chiffre')
   .regex(/[^A-Za-z0-9]/, 'Au moins un caractere special');
+
+/**
+ * Mot de passe ETUDIANT - assoupli pour l'adoption: 12 caracteres minimum,
+ * sans complexite imposee (les etudiants sont des utilisateurs de masse).
+ */
+export const studentPasswordSchema = z
+  .string()
+  .min(12, 'Minimum 12 caracteres')
+  .max(128);

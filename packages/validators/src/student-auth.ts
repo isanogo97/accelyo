@@ -2,11 +2,11 @@
  * Validation de l'authentification etudiant (app mobile).
  */
 import { z } from 'zod';
-import { emailSchema, passwordSchema } from './common';
+import { emailSchema, studentPasswordSchema } from './common';
 
 export const studentActivateSchema = z.object({
   token: z.string().min(10),
-  password: passwordSchema,
+  password: studentPasswordSchema,
 });
 export type StudentActivateInput = z.infer<typeof studentActivateSchema>;
 
